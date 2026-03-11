@@ -1,0 +1,98 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "CoW Protocol Python SDK",
+  "projectDescription": "Python SDK for interacting with CoWSwap and CoW Protocol, featuring MEV-protected trading, order management, and multi-chain support.",
+  "theme": "palm",
+  "primaryColor": "#fac704",
+  "lightColor": "#c12306",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/chains",
+              "concepts/orders",
+              "concepts/trading"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/swapping-tokens",
+              "guides/managing-orders",
+              "guides/querying-subgraph",
+              "guides/contract-interaction",
+              "guides/app-data"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/composable-orders",
+              "advanced/twap-orders",
+              "advanced/signing-schemes",
+              "advanced/multi-chain"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Modules",
+            "pages": [
+              "api/swap",
+              "api/order-book",
+              "api/subgraph",
+              "api/contracts"
+            ]
+          },
+          {
+            "group": "Advanced Modules",
+            "pages": [
+              "api/composable",
+              "api/app-data",
+              "api/common"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Token swapping with MEV protection",
+    "Order management (create, fetch, cancel)",
+    "Subgraph querying for trading data",
+    "Smart contract interactions",
+    "Multi-chain support (Ethereum, Gnosis, Arbitrum, Base, Polygon, Avalanche, BNB, Lens)",
+    "Composable conditional orders",
+    "TWAP (Time-Weighted Average Price) orders",
+    "App data encoding and CID pinning"
+  ],
+  "publicApiSurface": [
+    "swap_tokens",
+    "OrderBookApi",
+    "SubgraphClient",
+    "Order",
+    "ConditionalOrder",
+    "Chain",
+    "sign_order",
+    "AppDataDoc",
+    "AppDataCID",
+    "domain",
+    "TWAP"
+  ]
+}
