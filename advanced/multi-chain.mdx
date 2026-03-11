@@ -1,0 +1,541 @@
+---
+title: Multi-Chain Trading
+description: Execute trades across Ethereum, Gnosis Chain, Arbitrum, Base, Polygon, Avalanche, BNB, and Lens networks
+---
+
+## Overview
+
+CoW Protocol Python SDK supports trading on **multiple EVM-compatible chains**, enabling you to build cross-chain trading strategies and multi-network applications.
+
+## Supported Chains
+
+The SDK provides built-in support for these networks:
+
+```python supported_chains.py
+from cowdao_cowpy.common.chains import Chain
+
+# All supported chains
+print("Supported chains:")
+for chain in Chain:
+    print(f"  {chain.name}: Chain ID {chain.chain_id.value}")
+    print(f"    Explorer: {chain.explorer}")
+```
+
+### Chain Enumeration
+
+<CardGroup cols={2}>
+  <Card title="Ethereum Mainnet" icon="ethereum">
+    **Chain ID:** 1  
+    **Network:** `ethereum`  
+    **Explorer:** https://etherscan.io
+  </Card>
+  
+  <Card title="Gnosis Chain" icon="circle-nodes">
+    **Chain ID:** 100  
+    **Network:** `gnosis`  
+    **Explorer:** https://gnosisscan.io
+  </Card>
+  
+  <Card title="Arbitrum One" icon="layer-group">
+    **Chain ID:** 42161  
+    **Network:** `arbitrum_one`  
+    **Explorer:** https://arbiscan.io
+  </Card>
+  
+  <Card title="Base" icon="b">
+    **Chain ID:** 8453  
+    **Network:** `base`  
+    **Explorer:** https://basescan.org
+  </Card>
+  
+  <Card title="Polygon" icon="p">
+    **Chain ID:** 137  
+    **Network:** `polygon`  
+    **Explorer:** https://polygonscan.com
+  </Card>
+  
+  <Card title="Avalanche" icon="mountain">
+    **Chain ID:** 43114  
+    **Network:** `avalanche`  
+    **Explorer:** https://snowtrace.io
+  </Card>
+  
+  <Card title="BNB Chain" icon="coins">
+    **Chain ID:** 56  
+    **Network:** `bnb`  
+    **Explorer:** https://bscscan.com
+  </Card>
+  
+  <Card title="Lens" icon="camera">
+    **Chain ID:** 232  
+    **Network:** `lens`  
+    **Explorer:** https://explorer.lens.xyz
+  </Card>
+</CardGroup>
+
+### Testnet Support
+
+```python testnets.py
+from cowdao_cowpy.common.chains import Chain
+
+# Sepolia testnet for Ethereum
+testnet_chain = Chain.SEPOLIA
+print(f"Chain ID: {testnet_chain.chain_id.value}")  # 11155111
+print(f"Explorer: {testnet_chain.explorer}")  # https://sepolia.etherscan.io
+```
+
+## Chain Properties
+
+Each `Chain` enum provides useful properties:
+
+```python chain_properties.py
+from cowdao_cowpy.common.chains import Chain
+
+chain = Chain.ARBITRUM_ONE
+
+# Access chain properties
+print(f"Name: {chain.name}")              # arbitrum_one
+print(f"Chain ID: {chain.chain_id}")      # SupportedChainId.ARBITRUM_ONE
+print(f"Chain ID value: {chain.chain_id.value}")  # 42161
+print(f"Explorer: {chain.explorer}")      # https://arbiscan.io
+print(f"Network name: {chain.network_name}")  # arbitrum_one
+```
+
+## Chain-Specific Configuration
+
+Different operations require chain-specific configurations:
+
+### Selecting a Chain for Trading
+
+```python chain_trading.py
+import asyncio
+from web3 import Account, Web3
+from web3.types import Wei
+from cowdao_cowpy.cow.swap import swap_tokens
+from cowdao_cowpy.common.chains import Chain
+import os
+
+# Swap on Ethereum Mainnet
+async def swap_on_mainnet():
+    account = Account.from_key(os.getenv("PRIVATE_KEY"))
+    
+    await swap_tokens(
+        amount=Wei(1000000),
+        account=account,
+        chain=Chain.MAINNET,  # Ethereum
+        sell_token=Web3.to_checksum_address("0xUSDC_ADDRESS"),
+        buy_token=Web3.to_checksum_address("0xWETH_ADDRESS")
+    )
+
+# Swap on Arbitrum
+async def swap_on_arbitrum():
+    account = Account.from_key(os.getenv("PRIVATE_KEY"))
+    
+    await swap_tokens(
+        amount=Wei(1000000),
+        account=account,
+        chain=Chain.ARBITRUM_ONE,  # Arbitrum
+        sell_token=Web3.to_checksum_address("0xARB_USDC_ADDRESS"),
+        buy_token=Web3.to_checksum_address("0xARB_WETH_ADDRESS")
+    )
+
+# Run both
+await swap_on_mainnet()
+await swap_on_arbitrum()
+```
+
+### Chain-Specific Contract Addresses
+
+The SDK maintains chain-specific contract addresses:
+
+```python chain_contracts.py
+from cowdao_cowpy.common.constants import (
+    COW_PROTOCOL_SETTLEMENT_CONTRACT_CHAIN_ADDRESS_MAP,
+    COW_PROTOCOL_VAULT_RELAYER_ADDRESS_MAP
+)
+from cowdao_cowpy.common.chains import Chain
+
+# Get settlement contract for a chain
+chain = Chain.GNOSIS
+settlement_address = COW_PROTOCOL_SETTLEMENT_CONTRACT_CHAIN_ADDRESS_MAP[
+    chain.chain_id
+].value
+
+print(f"Settlement contract on {chain.name}: {settlement_address}")
+
+# Get vault relayer address
+vault_relayer = COW_PROTOCOL_VAULT_RELAYER_ADDRESS_MAP[
+    chain.chain_id
+].value
+
+print(f"Vault relayer on {chain.name}: {vault_relayer}")
+```
+
+## Working with Chain IDs
+
+### SupportedChainId Enum
+
+```python chain_id.py
+from cowdao_cowpy.common.config import SupportedChainId
+from cowdao_cowpy.common.chains import Chain
+
+# Access chain IDs directly
+print(SupportedChainId.MAINNET.value)       # 1
+print(SupportedChainId.GNOSIS_CHAIN.value)  # 100
+print(SupportedChainId.ARBITRUM_ONE.value)  # 42161
+print(SupportedChainId.BASE.value)          # 8453
+print(SupportedChainId.POLYGON.value)       # 137
+print(SupportedChainId.AVALANCHE.value)     # 43114
+print(SupportedChainId.BNB.value)           # 56
+print(SupportedChainId.LENS.value)          # 232
+
+# Convert between Chain and SupportedChainId
+chain = Chain.BASE
+chain_id = chain.chain_id  # Returns SupportedChainId.BASE
+print(f"Numeric ID: {chain_id.value}")  # 8453
+```
+
+## Multi-Chain Order Management
+
+Create and manage orders on different chains:
+
+```python multichain_orders.py
+import asyncio
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.order_book.config import OrderBookAPIConfigFactory
+from cowdao_cowpy.common.chains import Chain
+from cowdao_cowpy.common.config import SupportedChainId
+
+async def get_orders_multichain(owner_address: str):
+    """Fetch orders from multiple chains"""
+    
+    chains_to_check = [
+        Chain.MAINNET,
+        Chain.GNOSIS,
+        Chain.ARBITRUM_ONE,
+        Chain.BASE
+    ]
+    
+    for chain in chains_to_check:
+        # Create chain-specific API client
+        config = OrderBookAPIConfigFactory.get_config("prod", chain.chain_id)
+        api = OrderBookApi(config)
+        
+        try:
+            # Fetch orders for this chain
+            orders = await api.get_orders(owner=owner_address)
+            print(f"\n{chain.name} ({chain.chain_id.value}):")
+            print(f"  Found {len(orders)} orders")
+            
+            for order in orders[:3]:  # Show first 3
+                print(f"    - {order.uid}: {order.sell_amount} {order.sell_token}")
+        
+        except Exception as e:
+            print(f"  Error fetching from {chain.name}: {e}")
+
+await get_orders_multichain("0xYourAddress")
+```
+
+## Composable Orders Across Chains
+
+Create conditional orders on different networks:
+
+```python multichain_twap.py
+import asyncio
+from web3 import Web3
+from cowdao_cowpy.composable.order_types.twap import (
+    Twap,
+    TwapData,
+    StartType,
+    DurationType
+)
+from cowdao_cowpy.common.chains import Chain
+
+def create_twap_for_chain(chain: Chain) -> Twap:
+    """Create a TWAP order for a specific chain"""
+    
+    # Chain-specific token addresses
+    token_addresses = {
+        Chain.MAINNET: {
+            "USDC": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "WETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        },
+        Chain.ARBITRUM_ONE: {
+            "USDC": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+            "WETH": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+        },
+        Chain.BASE: {
+            "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "WETH": "0x4200000000000000000000000000000000000006"
+        }
+    }
+    
+    tokens = token_addresses.get(chain)
+    if not tokens:
+        raise ValueError(f"No token addresses configured for {chain.name}")
+    
+    twap_data = TwapData(
+        sell_token=Web3.to_checksum_address(tokens["USDC"]),
+        buy_token=Web3.to_checksum_address(tokens["WETH"]),
+        receiver=Web3.to_checksum_address("0xYourAddress"),
+        sell_amount=1000 * 10**6,  # 1000 USDC
+        buy_amount=int(0.5 * 10**18),  # 0.5 WETH
+        start_type=StartType.AT_MINING_TIME,
+        number_of_parts=10,
+        time_between_parts=3600,
+        duration_type=DurationType.AUTO,
+        app_data="0x" + "0" * 64
+    )
+    
+    return Twap.from_data(twap_data)
+
+# Create TWAPs on different chains
+mainnet_twap = create_twap_for_chain(Chain.MAINNET)
+arbitrum_twap = create_twap_for_chain(Chain.ARBITRUM_ONE)
+base_twap = create_twap_for_chain(Chain.BASE)
+
+print(f"Mainnet TWAP: {mainnet_twap.id}")
+print(f"Arbitrum TWAP: {arbitrum_twap.id}")
+print(f"Base TWAP: {base_twap.id}")
+```
+
+## Contract Interaction Across Chains
+
+Interact with contracts on different chains:
+
+```python multichain_contracts.py
+import asyncio
+from cowdao_cowpy.codegen.__generated__.ComposableCow import ComposableCow
+from cowdao_cowpy.codegen.__generated__.TWAP import TWAP
+from cowdao_cowpy.common.chains import Chain
+from web3 import AsyncWeb3
+
+async def get_contract_on_chain(chain: Chain):
+    """Initialize contracts for a specific chain"""
+    
+    # Chain-specific RPC endpoints
+    rpc_endpoints = {
+        Chain.MAINNET: "https://rpc.ankr.com/eth",
+        Chain.GNOSIS: "https://rpc.ankr.com/gnosis",
+        Chain.ARBITRUM_ONE: "https://rpc.ankr.com/arbitrum",
+        Chain.BASE: "https://rpc.ankr.com/base",
+        Chain.POLYGON: "https://rpc.ankr.com/polygon"
+    }
+    
+    # Initialize ComposableCow contract for the chain
+    composable_cow = ComposableCow(chain=chain)
+    print(f"\n{chain.name}:")
+    print(f"  ComposableCow initialized")
+    
+    # Initialize TWAP contract
+    twap_contract = TWAP(chain=chain)
+    print(f"  TWAP contract initialized")
+    
+    return composable_cow, twap_contract
+
+# Get contracts for multiple chains
+for chain in [Chain.MAINNET, Chain.ARBITRUM_ONE, Chain.BASE]:
+    await get_contract_on_chain(chain)
+```
+
+## RPC Provider Configuration
+
+Configure Web3 providers for different chains:
+
+```python multichain_providers.py
+from web3 import Web3, AsyncWeb3
+from cowdao_cowpy.common.chains import Chain
+from typing import Dict
+
+# RPC endpoint mapping
+RPC_URLS: Dict[Chain, str] = {
+    Chain.MAINNET: "https://rpc.ankr.com/eth",
+    Chain.SEPOLIA: "https://rpc.ankr.com/eth_sepolia",
+    Chain.GNOSIS: "https://rpc.ankr.com/gnosis",
+    Chain.ARBITRUM_ONE: "https://rpc.ankr.com/arbitrum",
+    Chain.BASE: "https://rpc.ankr.com/base",
+    Chain.POLYGON: "https://rpc.ankr.com/polygon",
+    Chain.AVALANCHE: "https://rpc.ankr.com/avalanche",
+    Chain.BNB: "https://rpc.ankr.com/bsc",
+}
+
+def get_provider(chain: Chain) -> Web3:
+    """Get a Web3 provider for the specified chain"""
+    rpc_url = RPC_URLS.get(chain)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for {chain.name}")
+    
+    return Web3(Web3.HTTPProvider(rpc_url))
+
+def get_async_provider(chain: Chain) -> AsyncWeb3:
+    """Get an async Web3 provider for the specified chain"""
+    rpc_url = RPC_URLS.get(chain)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for {chain.name}")
+    
+    return AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(rpc_url))
+
+# Usage
+mainnet_provider = get_provider(Chain.MAINNET)
+block = mainnet_provider.eth.block_number
+print(f"Mainnet block: {block}")
+
+arbitrum_provider = get_async_provider(Chain.ARBITRUM_ONE)
+block = await arbitrum_provider.eth.block_number
+print(f"Arbitrum block: {block}")
+```
+
+## API Configuration Per Chain
+
+Configure API clients for different chains:
+
+```python api_config_multichain.py
+from cowdao_cowpy.order_book.config import OrderBookAPIConfigFactory
+from cowdao_cowpy.common.config import SupportedChainId, CowEnv
+
+# Get production API config for different chains
+mainnet_config = OrderBookAPIConfigFactory.get_config("prod", SupportedChainId.MAINNET)
+gnosis_config = OrderBookAPIConfigFactory.get_config("prod", SupportedChainId.GNOSIS_CHAIN)
+arbitrum_config = OrderBookAPIConfigFactory.get_config("prod", SupportedChainId.ARBITRUM_ONE)
+
+print(f"Mainnet API: {mainnet_config.base_url}")
+print(f"Gnosis API: {gnosis_config.base_url}")
+print(f"Arbitrum API: {arbitrum_config.base_url}")
+
+# Use staging environment
+staging_config = OrderBookAPIConfigFactory.get_config("staging", SupportedChainId.SEPOLIA)
+print(f"Staging API: {staging_config.base_url}")
+```
+
+## Chain Detection and Validation
+
+```python chain_validation.py
+from cowdao_cowpy.common.chains import Chain, SUPPORTED_CHAINS
+from cowdao_cowpy.common.config import SupportedChainId
+
+def is_chain_supported(chain_id: int) -> bool:
+    """Check if a chain ID is supported"""
+    supported_ids = [chain.chain_id.value for chain in SUPPORTED_CHAINS]
+    return chain_id in supported_ids
+
+def get_chain_by_id(chain_id: int) -> Chain:
+    """Get Chain enum by chain ID"""
+    for chain in Chain:
+        if chain.chain_id.value == chain_id:
+            return chain
+    raise ValueError(f"Unsupported chain ID: {chain_id}")
+
+# Usage
+print(is_chain_supported(1))        # True (Mainnet)
+print(is_chain_supported(42161))    # True (Arbitrum)
+print(is_chain_supported(999999))   # False
+
+chain = get_chain_by_id(8453)
+print(f"Chain: {chain.name}")  # BASE
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Chain-Specific Token Addresses">
+    Token addresses differ across chains. Always maintain a mapping of token addresses per chain.
+  </Accordion>
+  
+  <Accordion title="Configure Appropriate RPC Providers">
+    Use reliable RPC providers for each chain. Consider rate limits and latency for your use case.
+  </Accordion>
+  
+  <Accordion title="Handle Chain-Specific Gas">
+    Gas prices and confirmation times vary significantly between chains. Adjust your strategies accordingly.
+  </Accordion>
+  
+  <Accordion title="Test on Testnets">
+    Use Sepolia for Ethereum testing. Other chains may have their own testnets.
+  </Accordion>
+  
+  <Accordion title="Monitor Chain Health">
+    Implement monitoring for RPC endpoint health and chain congestion across all chains you support.
+  </Accordion>
+</AccordionGroup>
+
+## Complete Multi-Chain Example
+
+```python complete_multichain.py
+import asyncio
+import os
+from web3 import Account, AsyncWeb3
+from cowdao_cowpy.cow.swap import swap_tokens
+from cowdao_cowpy.common.chains import Chain
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.order_book.config import OrderBookAPIConfigFactory
+
+async def execute_multichain_strategy():
+    """Execute swaps across multiple chains"""
+    
+    account = Account.from_key(os.getenv("PRIVATE_KEY"))
+    
+    # Define trades on different chains
+    trades = [
+        {
+            "chain": Chain.MAINNET,
+            "sell_token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",  # USDC
+            "buy_token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",   # WETH
+            "amount": 1000 * 10**6
+        },
+        {
+            "chain": Chain.ARBITRUM_ONE,
+            "sell_token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",  # USDC
+            "buy_token": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",   # WETH
+            "amount": 500 * 10**6
+        },
+        {
+            "chain": Chain.BASE,
+            "sell_token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",  # USDC
+            "buy_token": "0x4200000000000000000000000000000000000006",   # WETH
+            "amount": 250 * 10**6
+        }
+    ]
+    
+    # Execute all trades
+    results = await asyncio.gather(
+        *[execute_trade(trade, account) for trade in trades],
+        return_exceptions=True
+    )
+    
+    # Report results
+    for trade, result in zip(trades, results):
+        if isinstance(result, Exception):
+            print(f"❌ {trade['chain'].name}: {result}")
+        else:
+            print(f"✅ {trade['chain'].name}: Order placed successfully")
+
+async def execute_trade(trade_config: dict, account: Account):
+    """Execute a single trade"""
+    return await swap_tokens(
+        amount=trade_config["amount"],
+        account=account,
+        chain=trade_config["chain"],
+        sell_token=trade_config["sell_token"],
+        buy_token=trade_config["buy_token"]
+    )
+
+if __name__ == "__main__":
+    asyncio.run(execute_multichain_strategy())
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Supported Chains" icon="link" href="/concepts/chains">
+    Learn about chain configuration and properties
+  </Card>
+  <Card title="Order Management" icon="list-check" href="/guides/managing-orders">
+    Create and manage orders across chains
+  </Card>
+  <Card title="TWAP Orders" icon="clock" href="/advanced/twap-orders">
+    Execute TWAP strategies on multiple chains
+  </Card>
+  <Card title="Contract Interaction" icon="file-contract" href="/guides/contract-interaction">
+    Interact with contracts across networks
+  </Card>
+</CardGroup>

@@ -1,0 +1,716 @@
+---
+title: "Composable Orders"
+description: "API reference for composable conditional orders in the CoW Protocol Python SDK"
+---
+
+## Overview
+
+The `composable` module provides functionality for creating and managing conditional orders that execute based on specific conditions. It includes the core `ConditionalOrder` abstract class, the `Multiplexer` for managing multiple orders, and order types like TWAP.
+
+## ConditionalOrder
+
+Abstract base class for all conditional orders. Provides core functionality for order validation, serialization, and polling.
+
+### Constructor
+
+```python
+from cowdao_cowpy.composable import ConditionalOrder
+from cowdao_cowpy.common.chains import Chain
+from eth_typing import HexStr
+
+class MyOrder(ConditionalOrder[DataType, StructType]):
+    def __init__(
+        self,
+        handler: HexStr,
+        data: DataType,
+        salt: HexStr | None = None,
+        has_off_chain_input: bool = False,
+        chain: Chain = Chain.MAINNET,
+    ):
+        super().__init__(handler, data, salt, has_off_chain_input, chain)
+```
+
+<ParamField path="handler" type="HexStr" required>
+  The address of the handler contract for the conditional order. Must be a valid Ethereum address.
+</ParamField>
+
+<ParamField path="data" type="D" required>
+  The data structure containing order parameters in a friendly format.
+</ParamField>
+
+<ParamField path="salt" type="HexStr | None" default="None">
+  A 32-byte hex string used to salt the conditional order. If not provided, a random salt is generated.
+</ParamField>
+
+<ParamField path="has_off_chain_input" type="bool" default="False">
+  Whether the conditional order requires off-chain input for execution.
+</ParamField>
+
+<ParamField path="chain" type="Chain" default="Chain.MAINNET">
+  The blockchain network to use for this order.
+</ParamField>
+
+### Properties
+
+<ResponseField name="id" type="HexStr">
+  The unique identifier for the conditional order, calculated as `keccak256(serialize())`.
+  
+  ```python
+  order_id = order.id  # Returns HexStr like "0xabc123..."
+  ```
+</ResponseField>
+
+<ResponseField name="ctx" type="str">
+  The context key used to lookup the cabinet in the ComposableCoW contract. Returns `bytes32(0)` for merkle tree orders, otherwise `H(params)`.
+</ResponseField>
+
+<ResponseField name="leaf" type="ConditionalOrderParams">
+  The leaf data structure used for creating merkle trees, containing handler, salt, and encoded static input.
+</ResponseField>
+
+<ResponseField name="create_calldata" type="HexStr">
+  The calldata for creating the conditional order on-chain. Automatically determines whether to use `create` or `createWithContext` based on the order's context dependency.
+</ResponseField>
+
+<ResponseField name="remove_calldata" type="str">
+  The calldata for removing a conditional order that was created as a single order.
+</ResponseField>
+
+<ResponseField name="off_chain_input" type="HexStr">
+  Returns the off-chain input data if the order requires it. Override this method in subclasses that use off-chain input.
+</ResponseField>
+
+### Abstract Methods
+
+These methods must be implemented by any class inheriting from `ConditionalOrder`:
+
+#### is_valid
+
+```python
+def is_valid(self) -> IsValidResult:
+    """Validate the conditional order's parameters."""
+    pass
+```
+
+<ResponseField name="return" type="IsValidResult">
+  Returns an `IsValidResult` object with `is_valid` (bool) and optional `reason` (str) fields.
+</ResponseField>
+
+#### poll_validate
+
+```python
+async def poll_validate(self, params: PollParams) -> Optional[PollResultError]:
+    """Perform order-specific validation during polling."""
+    pass
+```
+
+<ParamField path="params" type="PollParams" required>
+  Polling parameters including owner, chain, provider, and orderbook API.
+</ParamField>
+
+<ResponseField name="return" type="Optional[PollResultError]">
+  Returns `None` if validation passes, or a `PollResultError` if the order should not be polled.
+</ResponseField>
+
+#### handle_poll_failed_already_present
+
+```python
+async def handle_poll_failed_already_present(
+    self, order_uid: str, order: Order, params: PollParams
+) -> Optional[PollResultError]:
+    """Handle the case when the polled order is already in the orderbook."""
+    pass
+```
+
+#### transform_data_to_struct
+
+```python
+def transform_data_to_struct(self, params: D) -> S:
+    """Convert friendly data format to contract struct format."""
+    pass
+```
+
+#### transform_struct_to_data
+
+```python
+def transform_struct_to_data(self, params: S) -> D:
+    """Convert contract struct format to friendly data format."""
+    pass
+```
+
+#### to_string
+
+```python
+def to_string(self, token_formatter: Optional[Callable] = None) -> str:
+    """Create a human-readable representation of the order."""
+    pass
+```
+
+#### serialize
+
+```python
+def serialize(self) -> HexStr:
+    """Serialize the order to its ABI-encoded form."""
+    pass
+```
+
+#### encode_static_input
+
+```python
+def encode_static_input(self) -> HexStr:
+    """Encode the staticInput for the conditional order."""
+    pass
+```
+
+### Methods
+
+#### poll
+
+```python
+async def poll(self, params: PollParams) -> PollResult:
+    """Poll the conditional order to check if it's tradeable."""
+```
+
+<ParamField path="params" type="PollParams" required>
+  Polling context including:
+  - `owner`: Owner's address
+  - `chain`: The blockchain network
+  - `provider`: AsyncWeb3 provider
+  - `order_book_api`: OrderBookApi instance
+</ParamField>
+
+<ResponseField name="return" type="PollResult">
+  Returns either:
+  - `PollResultSuccess` with tradeable order and signature
+  - `PollResultError` with error code and reason
+</ResponseField>
+
+```python
+from cowdao_cowpy.composable.types import PollParams
+
+result = await order.poll(PollParams(
+    owner="0x...",
+    chain=Chain.MAINNET,
+    provider=web3,
+    order_book_api=api
+))
+
+if result.result == PollResultCode.SUCCESS:
+    print(f"Order ready: {result.order}")
+    print(f"Signature: {result.signature}")
+```
+
+#### is_authorized
+
+```python
+async def is_authorized(self, params: OwnerParams) -> bool:
+    """Check if the owner has authorized this conditional order."""
+```
+
+<ResponseField name="return" type="bool">
+  Returns `True` if the order is authorized, `False` otherwise.
+</ResponseField>
+
+#### cabinet
+
+```python
+async def cabinet(self, params: OwnerParams) -> str:
+    """Get the cabinet value for this order and owner."""
+```
+
+<ResponseField name="return" type="str">
+  The cabinet value as a hex string without the '0x' prefix.
+</ResponseField>
+
+#### compute_order_uid
+
+```python
+def compute_order_uid(self, chain: Chain, owner: str, order: Order) -> str:
+    """Compute the unique identifier for an order."""
+```
+
+#### encode_static_input_helper
+
+```python
+def encode_static_input_helper(
+    self, order_data_types: Iterable[TypeStr], static_input: S
+) -> HexStr:
+    """Helper function for generically serializing static input."""
+```
+
+### Static Methods
+
+#### leaf_to_id
+
+```python
+@staticmethod
+def leaf_to_id(leaf: ConditionalOrderParams) -> str:
+    """Calculate the ID from a conditional order leaf."""
+```
+
+#### deserialize_helper
+
+```python
+@staticmethod
+def deserialize_helper(
+    encoded_data: HexStr,
+    handler: str,
+    order_data_types: List[str],
+    callback: Callable[[Any, HexStr], T],
+) -> T:
+    """Helper function for generically deserializing a conditional order."""
+```
+
+<ParamField path="encoded_data" type="HexStr" required>
+  The ABI-encoded IConditionalOrder.Params struct to deserialize.
+</ParamField>
+
+<ParamField path="handler" type="str" required>
+  Expected handler address for validation.
+</ParamField>
+
+<ParamField path="order_data_types" type="List[str]" required>
+  ABI types for the order's data struct.
+</ParamField>
+
+<ParamField path="callback" type="Callable" required>
+  Function that takes deserialized data and salt, returns order instance.
+</ParamField>
+
+---
+
+## Multiplexer
+
+Manages multiple conditional orders using merkle trees for efficient on-chain verification.
+
+### Constructor
+
+```python
+from cowdao_cowpy.composable import Multiplexer, ProofLocation
+
+multiplexer = Multiplexer(
+    orders={"order_id_1": order1, "order_id_2": order2},
+    root="0xabc...",
+    location=ProofLocation.PRIVATE
+)
+```
+
+<ParamField path="orders" type="Optional[Dict[str, ConditionalOrder]]" default="None">
+  Dictionary mapping order IDs to ConditionalOrder instances. Must have non-zero length if provided.
+</ParamField>
+
+<ParamField path="root" type="Optional[str]" default="None">
+  The merkle tree root. If orders are provided, root must also be provided and must match the computed root.
+</ParamField>
+
+<ParamField path="location" type="ProofLocation" default="ProofLocation.PRIVATE">
+  Where proofs are stored. Options: `PRIVATE`, `EMITTED`, `SWARM`, `WAKU`, `IPFS`.
+</ParamField>
+
+### Properties
+
+<ResponseField name="root" type="str">
+  The merkle tree root hash.
+  
+  ```python
+  root = multiplexer.root  # "0xabc123..."
+  ```
+</ResponseField>
+
+<ResponseField name="order_ids" type="List[str]">
+  List of all order IDs in the multiplexer.
+</ResponseField>
+
+### Methods
+
+#### add
+
+```python
+def add(self, order: ConditionalOrder):
+    """Add a new order to the multiplexer."""
+```
+
+<ParamField path="order" type="ConditionalOrder" required>
+  The conditional order to add. Order is validated before adding.
+</ParamField>
+
+```python
+from cowdao_cowpy.composable import Twap, TwapData
+
+twap = Twap.from_data(TwapData(
+    sell_token="0x...",
+    buy_token="0x...",
+    receiver="0x...",
+    sell_amount=1000000,
+    buy_amount=900000,
+    start_type=StartType.AT_MINING_TIME,
+    number_of_parts=10,
+    time_between_parts=3600,
+    duration_type=DurationType.AUTO,
+    app_data="0x..."
+))
+
+multiplexer.add(twap)
+```
+
+#### remove
+
+```python
+def remove(self, id: str):
+    """Remove an order by ID."""
+```
+
+#### update
+
+```python
+def update(self, id: str, updater: Callable):
+    """Update an order using an updater function."""
+```
+
+<ParamField path="id" type="str" required>
+  The ID of the order to update.
+</ParamField>
+
+<ParamField path="updater" type="Callable" required>
+  Function that takes (order, ctx) and returns the updated order.
+</ParamField>
+
+#### get_by_id
+
+```python
+def get_by_id(self, id: str) -> ConditionalOrder:
+    """Get an order by its ID."""
+```
+
+#### get_by_index
+
+```python
+def get_by_index(self, i: int) -> ConditionalOrder:
+    """Get an order by its index in the order list."""
+```
+
+#### get_proofs
+
+```python
+def get_proofs(self, filter: Optional[Callable] = None) -> List[ProofWithParams]:
+    """Get merkle proofs for orders, optionally filtered."""
+```
+
+<ParamField path="filter" type="Optional[Callable]" default="None">
+  Optional function to filter which orders to include. Takes a ConditionalOrder and returns bool.
+</ParamField>
+
+<ResponseField name="return" type="List[ProofWithParams]">
+  List of proofs with their associated order parameters.
+</ResponseField>
+
+#### prepare_proof_struct
+
+```python
+async def prepare_proof_struct(
+    self,
+    location: ProofLocation = None,
+    filter: Callable = None,
+    uploader: Callable = None,
+) -> tuple[int, HexBytes]:
+    """Prepare proof data for on-chain submission."""
+```
+
+<ParamField path="location" type="ProofLocation" default="None">
+  Override the default location for this proof preparation.
+</ParamField>
+
+<ParamField path="filter" type="Callable" default="None">
+  Optional filter function for orders.
+</ParamField>
+
+<ParamField path="uploader" type="Callable" default="None">
+  Required for SWARM, WAKU, or IPFS locations. Async function to upload proof data.
+</ParamField>
+
+<ResponseField name="return" type="tuple[int, HexBytes]">
+  Tuple of (location enum value, proof data bytes).
+</ResponseField>
+
+#### poll
+
+```python
+@staticmethod
+async def poll(
+    owner: HexStr,
+    p: ProofWithParams,
+    chain: Chain,
+    off_chain_input_fn: Optional[Callable] = None,
+) -> Tuple[Order, HexStr]:
+    """Poll a specific order from the multiplexer."""
+```
+
+<ParamField path="owner" type="HexStr" required>
+  The owner's address.
+</ParamField>
+
+<ParamField path="p" type="ProofWithParams" required>
+  The proof and parameters for the order.
+</ParamField>
+
+<ParamField path="chain" type="Chain" required>
+  The blockchain network.
+</ParamField>
+
+<ParamField path="off_chain_input_fn" type="Optional[Callable]" default="None">
+  Optional async function to provide off-chain input.
+</ParamField>
+
+<ResponseField name="return" type="Tuple[Order, HexStr]">
+  Returns (tradeable order, signature).
+</ResponseField>
+
+#### to_json / from_json
+
+```python
+def to_json(self) -> str:
+    """Serialize multiplexer to JSON."""
+
+@classmethod
+def from_json(cls, s: str) -> "Multiplexer":
+    """Deserialize multiplexer from JSON."""
+```
+
+#### register_order_type
+
+```python
+@classmethod
+def register_order_type(cls, order_type: str, conditional_order_class: type):
+    """Register a new order type with the multiplexer."""
+```
+
+<ParamField path="order_type" type="str" required>
+  The string identifier for the order type (e.g., "twap").
+</ParamField>
+
+<ParamField path="conditional_order_class" type="type" required>
+  The ConditionalOrder subclass to register.
+</ParamField>
+
+```python
+Multiplexer.register_order_type("twap", Twap)
+```
+
+---
+
+## TWAP Order Type
+
+Time-Weighted Average Price orders split a large order into smaller parts executed over time.
+
+### Twap
+
+```python
+from cowdao_cowpy.composable import Twap, TwapData, StartType, DurationType
+from eth_typing import HexStr
+
+twap = Twap(
+    handler=TWAP_ADDRESS,
+    data=TwapData(...),
+    salt=None
+)
+```
+
+<ParamField path="handler" type="HexStr" required>
+  Must be the TWAP handler address: `0x6cF1e9cA41f7611dEf408122793c358a3d11E5a5`
+</ParamField>
+
+<ParamField path="data" type="TwapData" required>
+  The TWAP order parameters.
+</ParamField>
+
+<ParamField path="salt" type="Optional[HexStr]" default="None">
+  Optional salt value.
+</ParamField>
+
+### TwapData
+
+```python
+@dataclass
+class TwapData:
+    sell_token: str
+    buy_token: str
+    receiver: str
+    sell_amount: int
+    buy_amount: int
+    start_type: StartType
+    number_of_parts: int
+    time_between_parts: int
+    duration_type: DurationType
+    app_data: str
+    start_time_epoch: int = 0
+    duration_of_part: int = 0
+```
+
+<ParamField path="sell_token" type="str" required>
+  Address of the token to sell.
+</ParamField>
+
+<ParamField path="buy_token" type="str" required>
+  Address of the token to buy.
+</ParamField>
+
+<ParamField path="receiver" type="str" required>
+  Address to receive the bought tokens.
+</ParamField>
+
+<ParamField path="sell_amount" type="int" required>
+  Total amount of sell tokens (across all parts).
+</ParamField>
+
+<ParamField path="buy_amount" type="int" required>
+  Minimum total amount of buy tokens (across all parts).
+</ParamField>
+
+<ParamField path="start_type" type="StartType" required>
+  When the TWAP starts: `StartType.AT_MINING_TIME` or `StartType.AT_EPOCH`.
+</ParamField>
+
+<ParamField path="number_of_parts" type="int" required>
+  Number of parts to split the order into (2 to 2³²).
+</ParamField>
+
+<ParamField path="time_between_parts" type="int" required>
+  Seconds between each part (1 to 31,536,000).
+</ParamField>
+
+<ParamField path="duration_type" type="DurationType" required>
+  `DurationType.AUTO` or `DurationType.LIMIT_DURATION`.
+</ParamField>
+
+<ParamField path="app_data" type="str" required>
+  App data hash for the order.
+</ParamField>
+
+<ParamField path="start_time_epoch" type="int" default="0">
+  Unix timestamp for start time (required if `start_type` is `AT_EPOCH`).
+</ParamField>
+
+<ParamField path="duration_of_part" type="int" default="0">
+  Duration of each part in seconds (required if `duration_type` is `LIMIT_DURATION`).
+</ParamField>
+
+### Example
+
+```python
+from cowdao_cowpy.composable import Twap, TwapData, StartType, DurationType
+
+# Create a TWAP that sells 1000 tokens in 10 parts over 10 hours
+twap_data = TwapData(
+    sell_token="0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",  # WETH
+    buy_token="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",   # USDC
+    receiver="0x...",
+    sell_amount=1000000000000000000000,  # 1000 WETH
+    buy_amount=3000000000,  # 3000 USDC minimum
+    start_type=StartType.AT_MINING_TIME,
+    number_of_parts=10,
+    time_between_parts=3600,  # 1 hour
+    duration_type=DurationType.AUTO,
+    app_data="0x..."
+)
+
+twap = Twap.from_data(twap_data)
+
+# Validate the order
+validation = twap.is_valid()
+if validation.is_valid:
+    print(f"Order ID: {twap.id}")
+    print(f"Create calldata: {twap.create_calldata}")
+```
+
+---
+
+## Types
+
+### ProofLocation
+
+```python
+class ProofLocation(Enum):
+    PRIVATE = 0
+    EMITTED = 1
+    SWARM = 2
+    WAKU = 3
+    RESERVED = 4
+    IPFS = 5
+```
+
+### PollResultCode
+
+```python
+class PollResultCode(Enum):
+    SUCCESS = "SUCCESS"
+    UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
+    TRY_NEXT_BLOCK = "TRY_NEXT_BLOCK"
+    TRY_ON_BLOCK = "TRY_ON_BLOCK"
+    TRY_AT_EPOCH = "TRY_AT_EPOCH"
+    DONT_TRY_AGAIN = "DONT_TRY_AGAIN"
+```
+
+### IsValidResult
+
+```python
+@dataclass
+class IsValidResult:
+    is_valid: bool
+    reason: Optional[str] = None
+```
+
+### ConditionalOrderParams
+
+```python
+@dataclass
+class ConditionalOrderParams:
+    handler: HexStr
+    salt: HexStr
+    static_input: HexStr
+```
+
+---
+
+## Utility Functions
+
+### encode_params
+
+```python
+def encode_params(params: ConditionalOrderParams) -> HexStr:
+    """Encode conditional order parameters to ABI format."""
+```
+
+### decode_params
+
+```python
+def decode_params(encoded: HexStr) -> ConditionalOrderParams:
+    """Decode ABI-encoded parameters to ConditionalOrderParams."""
+```
+
+### hash_order
+
+```python
+def hash_order(domain: Dict[str, Any], order: Dict[str, Any]) -> str:
+    """Compute the EIP-712 hash of an order."""
+```
+
+### hash_order_cancellation
+
+```python
+def hash_order_cancellation(domain: Dict[str, Any], order_uid: str) -> str:
+    """Compute the EIP-712 hash for cancelling a single order."""
+```
+
+### hash_order_cancellations
+
+```python
+def hash_order_cancellations(domain: Dict[str, Any], order_uids: List[str]) -> str:
+    """Compute the EIP-712 hash for cancelling multiple orders."""
+```
+
+### encode_order
+
+```python
+def encode_order(order: Dict[str, Any]) -> bytes:
+    """Encode an order to bytes for hashing."""
+```

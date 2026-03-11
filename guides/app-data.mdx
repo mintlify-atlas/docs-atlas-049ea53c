@@ -1,0 +1,463 @@
+---
+title: 'App Data'
+description: 'Encode metadata with AppDataDoc and AppDataCID for order customization'
+---
+
+## Overview
+
+App Data allows you to attach arbitrary metadata to your CoW Protocol orders. This can include referral information, custom UI parameters, partner fees, and other application-specific data. The SDK provides utilities for creating, encoding, and decoding app data.
+
+## What is App Data?
+
+App Data consists of:
+
+- **AppDataDoc**: A JSON document containing your metadata
+- **AppDataHash**: A keccak256 hash of the document (used in orders)
+- **AppDataCID**: An IPFS Content Identifier for the document
+
+## Creating App Data
+
+### Basic App Data
+
+```python
+from cowdao_cowpy.app_data.app_data_doc import AppDataDoc
+
+# Create app data with default values
+app_data = AppDataDoc()
+
+# Get the hex hash (use this in orders)
+app_data_hash = app_data.to_hex()
+print(f"App data hash: {app_data_hash}")
+
+# Convert to IPFS CID
+app_data_cid = app_data.to_cid()
+print(f"IPFS CID: {app_data_cid}")
+```
+
+### Custom App Data
+
+```python
+# Create custom app data
+custom_data = {
+    "appCode": "MyTradingApp",
+    "metadata": {
+        "referrer": {
+            "address": "0x1234567890abcdef1234567890abcdef12345678"
+        },
+        "utm": {
+            "utmSource": "telegram",
+            "utmMedium": "social",
+            "utmCampaign": "spring2024",
+            "utmContent": "My custom message"
+        }
+    },
+    "version": "1.0.0"
+}
+
+app_data = AppDataDoc(app_data_doc=custom_data)
+app_data_hash = app_data.to_hex()
+print(f"Custom app data hash: {app_data_hash}")
+```
+
+## Using the Utility Functions
+
+The SDK provides high-level functions for common app data operations:
+
+### Generate App Data
+
+```python
+from cowdao_cowpy.app_data.utils import generate_app_data, PartnerFee
+
+# Simple app data
+result = generate_app_data(
+    app_code="MyApp",
+    graffiti="Hello CoW Protocol!"
+)
+
+print(f"App data hash: {result.app_data_hash.root}")
+```
+
+### With Referrer Address
+
+```python
+# App data with referrer
+result = generate_app_data(
+    app_code="MyApp",
+    referrer_address="0x1234567890abcdef1234567890abcdef12345678",
+    graffiti="Referral trade"
+)
+
+print(f"App data with referrer: {result.app_data_hash.root}")
+```
+
+### With Partner Fees
+
+```python
+# App data with partner fee
+partner_fee = PartnerFee(
+    bps=50,  # 0.5% fee (50 basis points)
+    recipient="0x1234567890abcdef1234567890abcdef12345679"
+)
+
+result = generate_app_data(
+    app_code="MyApp",
+    partner_fee=partner_fee,
+    graffiti="Partner trade"
+)
+
+print(f"App data with fee: {result.app_data_hash.root}")
+```
+
+### Complete Example
+
+```python
+# All options combined
+partner_fee = PartnerFee(
+    bps=100,  # 1% fee
+    recipient="0xfee...address"
+)
+
+result = generate_app_data(
+    app_code="MyTradingBot",
+    referrer_address="0xreferrer...address",
+    partner_fee=partner_fee,
+    graffiti="Automated trade #42"
+)
+
+app_data_object = result.app_data_object
+app_data_hash = result.app_data_hash
+
+print(f"Hash: {app_data_hash.root}")
+```
+
+## Uploading App Data to Order Book
+
+App data needs to be uploaded to the CoW Protocol API:
+
+```python
+import asyncio
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.app_data.utils import generate_app_data
+
+async def upload_app_data():
+    # Generate app data
+    result = generate_app_data(
+        app_code="MyApp",
+        graffiti="Test order"
+    )
+    
+    # Initialize API
+    order_book_api = OrderBookApi()
+    
+    # Upload app data
+    uploaded_hash = await order_book_api.put_app_data(
+        app_data=result.app_data_object,
+        app_data_hash=result.app_data_hash
+    )
+    
+    print(f"Uploaded app data hash: {uploaded_hash.root}")
+    
+    return uploaded_hash
+
+asyncio.run(upload_app_data())
+```
+
+## Retrieving App Data
+
+```python
+import asyncio
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.order_book.generated.model import AppDataHash
+
+async def retrieve_app_data():
+    order_book_api = OrderBookApi()
+    
+    # Retrieve app data by hash
+    app_data_hash = AppDataHash(
+        root="0x971c41b97f59534448ab833b0d83f755a4bc5c29f92b01776faa3699fcb0eeae"
+    )
+    
+    app_data = await order_book_api.get_app_data(app_data_hash)
+    print(f"Retrieved app data: {app_data}")
+
+asyncio.run(retrieve_app_data())
+```
+
+## Working with IPFS CIDs
+
+### Converting Hash to CID
+
+```python
+from cowdao_cowpy.app_data.app_data_hex import AppDataHex
+
+# Convert hex hash to CID
+app_data_hex = AppDataHex(
+    "971c41b97f59534448ab833b0d83f755a4bc5c29f92b01776faa3699fcb0eeae"  # Without 0x prefix
+)
+
+cid = app_data_hex.to_cid()
+print(f"IPFS CID: {cid}")
+```
+
+### Converting CID to Hash
+
+```python
+from cowdao_cowpy.app_data.app_data_cid import AppDataCid
+
+# Convert CID back to hex hash
+app_data_cid = AppDataCid(
+    "f01551220971c41b97f59534448ab833b0d83f755a4bc5c29f92b01776faa3699fcb0eeae"
+)
+
+hex_hash = app_data_cid.to_hex()
+print(f"Hex hash: {hex_hash}")
+```
+
+### Fetching from IPFS
+
+```python
+import asyncio
+from cowdao_cowpy.app_data.app_data_cid import AppDataCid
+
+async def fetch_from_ipfs():
+    app_data_cid = AppDataCid(
+        "f01551220971c41b97f59534448ab833b0d83f755a4bc5c29f92b01776faa3699fcb0eeae"
+    )
+    
+    # Fetch document from IPFS
+    doc = await app_data_cid.to_doc()
+    print(f"Document from IPFS: {doc}")
+
+asyncio.run(fetch_from_ipfs())
+```
+
+## Building and Posting for All Chains
+
+```python
+from cowdao_cowpy.app_data.utils import (
+    build_all_app_codes,
+    PartnerFee
+)
+
+# Upload to all supported chains
+partner_fee = PartnerFee(
+    bps=50,
+    recipient="0x1234567890abcdef1234567890abcdef12345679"
+)
+
+app_data_hash = build_all_app_codes(
+    env="prod",
+    app_code="MyMultiChainApp",
+    referrer_address="0x1234567890abcdef1234567890abcdef12345678",
+    partner_fee=partner_fee,
+    graffiti="Multi-chain deployment"
+)
+
+print(f"App data deployed to all chains: {app_data_hash}")
+```
+
+## Default App Data
+
+The SDK uses a default app data hash:
+
+```python
+from cowdao_cowpy.app_data.utils import DEFAULT_APP_DATA_HASH
+from cowdao_cowpy.app_data.consts import DEFAULT_APP_DATA_DOC
+
+print(f"Default hash: {DEFAULT_APP_DATA_HASH}")
+print(f"Default doc: {DEFAULT_APP_DATA_DOC}")
+```
+
+## Complete Example with Order
+
+```python complete_app_data.py
+import asyncio
+import os
+from dotenv import load_dotenv
+from web3 import Web3, Account
+from web3.types import Wei
+from cowdao_cowpy.cow.swap import swap_tokens
+from cowdao_cowpy.common.chains import Chain
+from cowdao_cowpy.app_data.utils import (
+    generate_app_data,
+    build_and_post_app_data,
+    PartnerFee
+)
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.order_book.config import OrderBookAPIConfigFactory
+from cowdao_cowpy.common.config import SupportedChainId
+
+load_dotenv()
+
+async def swap_with_custom_app_data():
+    # Setup
+    account = Account.from_key(os.getenv("PRIVATE_KEY"))
+    chain = Chain.SEPOLIA
+    
+    # Create order book API
+    config = OrderBookAPIConfigFactory.get_config(
+        "prod",
+        SupportedChainId.SEPOLIA
+    )
+    order_book_api = OrderBookApi(config)
+    
+    # Build and upload custom app data
+    partner_fee = PartnerFee(
+        bps=25,  # 0.25%
+        recipient="0x1234567890abcdef1234567890abcdef12345679"
+    )
+    
+    app_data_hash = build_and_post_app_data(
+        orderbook=order_book_api,
+        app_code="MyCustomApp",
+        referrer_address="0x1234567890abcdef1234567890abcdef12345678",
+        partner_fee=partner_fee,
+        graffiti="Custom swap with fees and referral"
+    )
+    
+    print(f"Using app data hash: {app_data_hash}")
+    
+    # Execute swap with custom app data
+    completed_order = await swap_tokens(
+        amount=Wei(1000000000000000000),  # 1 token
+        account=account,
+        chain=chain,
+        sell_token=Web3.to_checksum_address(
+            "0xbe72E441BF55620febc26715db68d3494213D8Cb"
+        ),
+        buy_token=Web3.to_checksum_address(
+            "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14"
+        ),
+        app_data=app_data_hash,  # Use custom app data
+    )
+    
+    print(f"Order created: {completed_order.uid}")
+    print(f"View at: {completed_order.url}")
+
+if __name__ == "__main__":
+    asyncio.run(swap_with_custom_app_data())
+```
+
+## App Data Schema
+
+The typical app data structure:
+
+```python
+app_data_schema = {
+    "appCode": "string",  # Your app identifier
+    "metadata": {
+        "referrer": {
+            "address": "0x...",  # Referrer address
+            "version": "string"  # Optional version
+        },
+        "partnerFee": {
+            "bps": 0,  # Basis points (100 = 1%)
+            "recipient": "0x..."  # Fee recipient
+        },
+        "utm": {
+            "utmSource": "string",
+            "utmMedium": "string",
+            "utmCampaign": "string",
+            "utmContent": "string"  # Graffiti message
+        },
+        "quote": {
+            "slippageBips": 0,  # Slippage in basis points
+            "version": "string"
+        }
+    },
+    "version": "string"  # Schema version
+}
+```
+
+## Deterministic JSON Serialization
+
+```python
+from cowdao_cowpy.app_data.utils import stringify_deterministic
+
+# Create deterministic JSON string
+data = {
+    "z": 3,
+    "a": 1,
+    "m": {"nested": "value", "another": "field"}
+}
+
+json_string = stringify_deterministic(data)
+print(json_string)  # Keys are sorted: {"a":1,"m":{"another":"field","nested":"value"},"z":3}
+```
+
+## Hash Computation
+
+```python
+from cowdao_cowpy.app_data.utils import keccak256
+import json
+
+# Manually compute hash
+data = {"appCode": "MyApp"}
+json_string = json.dumps(data, sort_keys=True, separators=(',', ':'))
+hash_value = keccak256(json_string.encode('utf-8'))
+print(f"Hash: 0x{hash_value}")
+```
+
+## Checking if App Data Exists
+
+```python
+import asyncio
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.order_book.generated.model import AppDataHash
+from cowdao_cowpy.app_data.utils import check_app_data_exists
+
+order_book_api = OrderBookApi()
+app_data_hash = AppDataHash(
+    root="0x971c41b97f59534448ab833b0d83f755a4bc5c29f92b01776faa3699fcb0eeae"
+)
+
+exists = check_app_data_exists(order_book_api, app_data_hash)
+if exists:
+    print("App data already exists")
+else:
+    print("App data needs to be uploaded")
+```
+
+## Constants
+
+```python
+from cowdao_cowpy.app_data.consts import (
+    DEFAULT_APP_CODE,
+    DEFAULT_GRAFFITI,
+    DEFAULT_IPFS_READ_URI,
+    DEFAULT_APP_DATA_DOC
+)
+
+print(f"Default app code: {DEFAULT_APP_CODE}")
+print(f"Default graffiti: {DEFAULT_GRAFFITI}")
+print(f"IPFS gateway: {DEFAULT_IPFS_READ_URI}")
+print(f"Default document: {DEFAULT_APP_DATA_DOC}")
+```
+
+## Best Practices
+
+<Tip>
+**Upload Before Use**: Always upload app data to the order book API before using it in an order. The solvers need to be able to retrieve it.
+</Tip>
+
+<Note>
+**Unique Hashes**: Different app data content produces different hashes. Use this to create unique orders even with identical token pairs and amounts.
+</Note>
+
+<Warning>
+**Partner Fees**: If you include partner fees, ensure the recipient address is correct. Fees are paid from the order's surplus.
+</Warning>
+
+## Use Cases
+
+- **Referral Tracking**: Include referrer addresses to track who brought users
+- **Partner Revenue**: Add partner fees to earn from order flow
+- **Campaign Attribution**: Use UTM parameters to track marketing campaigns  
+- **Order Identification**: Include unique identifiers in graffiti
+- **Version Tracking**: Tag orders with your app version for debugging
+
+## Next Steps
+
+- Learn about [Swapping Tokens](/guides/swapping-tokens) to use app data in swaps
+- Explore [Managing Orders](/guides/managing-orders) to upload and retrieve app data
+- Check [Contract Interaction](/guides/contract-interaction) for order signing with app data

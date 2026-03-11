@@ -1,0 +1,208 @@
+---
+title: 'Supported Chains'
+description: 'Learn about all blockchain networks supported by the CoW Protocol Python SDK'
+---
+
+## Overview
+
+The CoW Protocol Python SDK supports multiple blockchain networks through the `Chain` enum. Each chain includes configuration for chain IDs, network names, and block explorer URLs.
+
+## Accessing Chain Information
+
+Import the `Chain` enum from the SDK:
+
+```python
+from cowdao_cowpy.common.chains import Chain
+
+# Access chain properties
+chain = Chain.MAINNET
+print(chain.chain_id)      # SupportedChainId.MAINNET
+print(chain.name)          # "ethereum"
+print(chain.explorer)      # "https://etherscan.io"
+```
+
+## Supported Networks
+
+<CardGroup cols={2}>
+  <Card title="Ethereum Mainnet" icon="ethereum">
+    **Chain ID:** 1  
+    **Network Name:** ethereum  
+    **Explorer:** [etherscan.io](https://etherscan.io)
+    
+    ```python
+    Chain.MAINNET
+    ```
+  </Card>
+
+  <Card title="Sepolia Testnet" icon="flask">
+    **Chain ID:** 11155111  
+    **Network Name:** sepolia  
+    **Explorer:** [sepolia.etherscan.io](https://sepolia.etherscan.io)
+    
+    ```python
+    Chain.SEPOLIA
+    ```
+  </Card>
+
+  <Card title="Gnosis Chain" icon="circle-nodes">
+    **Chain ID:** 100  
+    **Network Name:** gnosis  
+    **Explorer:** [gnosisscan.io](https://gnosisscan.io)
+    
+    ```python
+    Chain.GNOSIS
+    ```
+  </Card>
+
+  <Card title="Arbitrum One" icon="layer-group">
+    **Chain ID:** 42161  
+    **Network Name:** arbitrum_one  
+    **Explorer:** [arbiscan.io](https://arbiscan.io)
+    
+    ```python
+    Chain.ARBITRUM_ONE
+    ```
+  </Card>
+
+  <Card title="Base" icon="cube">
+    **Chain ID:** 8453  
+    **Network Name:** base  
+    **Explorer:** [basescan.org](https://basescan.org)
+    
+    ```python
+    Chain.BASE
+    ```
+  </Card>
+
+  <Card title="Polygon" icon="hexagon">
+    **Chain ID:** 137  
+    **Network Name:** polygon  
+    **Explorer:** [polygonscan.com](https://polygonscan.com)
+    
+    ```python
+    Chain.POLYGON
+    ```
+  </Card>
+
+  <Card title="Avalanche" icon="mountain">
+    **Chain ID:** 43114  
+    **Network Name:** avalanche  
+    **Explorer:** [snowtrace.io](https://snowtrace.io)
+    
+    ```python
+    Chain.AVALANCHE
+    ```
+  </Card>
+
+  <Card title="BNB Chain" icon="coins">
+    **Chain ID:** 56  
+    **Network Name:** bnb  
+    **Explorer:** [bscscan.com](https://bscscan.com)
+    
+    ```python
+    Chain.BNB
+    ```
+  </Card>
+
+  <Card title="Lens Network" icon="eye">
+    **Chain ID:** 232  
+    **Network Name:** lens  
+    **Explorer:** [explorer.lens.xyz](https://explorer.lens.xyz)
+    
+    ```python
+    Chain.LENS
+    ```
+  </Card>
+</CardGroup>
+
+## Chain Properties
+
+Each `Chain` enum value provides three key properties:
+
+<Accordion title="chain_id">
+  Returns the `SupportedChainId` enum value representing the numeric chain identifier.
+  
+  ```python
+  from cowdao_cowpy.common.chains import Chain
+  
+  chain = Chain.MAINNET
+  chain_id = chain.chain_id  # SupportedChainId.MAINNET (value: 1)
+  ```
+</Accordion>
+
+<Accordion title="name">
+  Returns the network name as a string, useful for display and configuration purposes.
+  
+  ```python
+  from cowdao_cowpy.common.chains import Chain
+  
+  chain = Chain.GNOSIS
+  network_name = chain.name  # "gnosis"
+  ```
+</Accordion>
+
+<Accordion title="explorer">
+  Returns the block explorer URL for viewing transactions and addresses on the network.
+  
+  ```python
+  from cowdao_cowpy.common.chains import Chain
+  
+  chain = Chain.ARBITRUM_ONE
+  explorer_url = chain.explorer  # "https://arbiscan.io"
+  ```
+</Accordion>
+
+## Usage Example
+
+Here's a complete example showing how to use chains when creating a swap:
+
+```python
+import os
+import asyncio
+from dotenv import load_dotenv
+from web3 import Account, Web3
+from web3.types import Wei
+from cowdao_cowpy.cow.swap import swap_tokens
+from cowdao_cowpy.common.chains import Chain
+
+load_dotenv()
+PRIVATE_KEY = os.getenv("PRIVATE_KEY")
+ACCOUNT = Account.from_key(PRIVATE_KEY)
+
+# Define tokens and amount
+SELL_TOKEN = Web3.to_checksum_address("0xbe72E441BF55620febc26715db68d3494213D8Cb")
+BUY_TOKEN = Web3.to_checksum_address("0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14")
+AMOUNT = Wei(5000000000000000000)
+
+# Execute swap on Sepolia testnet
+result = await swap_tokens(
+    amount=AMOUNT,
+    account=ACCOUNT,
+    chain=Chain.SEPOLIA,  # Specify the chain
+    sell_token=SELL_TOKEN,
+    buy_token=BUY_TOKEN,
+)
+
+print(f"Order UID: {result.uid}")
+print(f"Order URL: {result.url}")
+```
+
+<Note>
+  When testing your integration, start with `Chain.SEPOLIA` to avoid risking real funds on mainnet.
+</Note>
+
+## Getting All Supported Chains
+
+You can retrieve all supported chains using the `SUPPORTED_CHAINS` constant:
+
+```python
+from cowdao_cowpy.common.chains import SUPPORTED_CHAINS
+
+# Iterate through all supported chains
+for chain in SUPPORTED_CHAINS:
+    print(f"{chain.name}: Chain ID {chain.chain_id.value}")
+```
+
+<Info>
+  The chain configuration is used internally by the SDK to determine API endpoints, contract addresses, and other network-specific settings.
+</Info>

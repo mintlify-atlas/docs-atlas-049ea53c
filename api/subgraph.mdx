@@ -1,0 +1,371 @@
+---
+title: "SubgraphClient"
+description: "Client for querying CoW Protocol subgraph data"
+---
+
+## SubgraphClient
+
+The `SubgraphClient` class provides methods to query historical data from the CoW Protocol subgraph, including trading volumes, totals, and other aggregated metrics.
+
+```python
+class SubgraphClient(AsyncBaseClient):
+    pass
+```
+
+### Initialization
+
+The `SubgraphClient` inherits from `AsyncBaseClient` and requires a subgraph URL for initialization.
+
+```python
+from cowdao_cowpy.subgraph.client import SubgraphClient
+
+# Initialize with default mainnet subgraph
+client = SubgraphClient(url="https://api.thegraph.com/subgraphs/name/cowprotocol/cow")
+
+# Or for Gnosis Chain
+client_gc = SubgraphClient(url="https://api.thegraph.com/subgraphs/name/cowprotocol/cow-gc")
+```
+
+## Methods
+
+### last_days_volume
+
+Query the trading volume for the last N days.
+
+```python
+async def last_days_volume(self, days: int, **kwargs: Any) -> LastDaysVolume
+```
+
+<ParamField path="days" type="int" required>
+  Number of days of volume data to retrieve
+</ParamField>
+
+<ParamField path="**kwargs" type="Any">
+  Additional keyword arguments to pass to the GraphQL query execution
+</ParamField>
+
+**Returns:** `LastDaysVolume` object containing daily volume data
+
+<ResponseField name="LastDaysVolume" type="LastDaysVolume">
+  Object containing daily trading volumes
+  
+  <Expandable title="LastDaysVolume fields">
+    <ResponseField name="daily_totals" type="List[LastDaysVolumeDailyTotals]">
+      List of daily volume records, ordered by timestamp (descending)
+      
+      <Expandable title="LastDaysVolumeDailyTotals fields">
+        <ResponseField name="timestamp" type="int">
+          Unix timestamp for the day
+        </ResponseField>
+        
+        <ResponseField name="volume_usd" type="Optional[Any]">
+          Trading volume in USD for that day
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Usage Example
+
+```python
+from cowdao_cowpy.subgraph.client import SubgraphClient
+
+# Initialize client
+client = SubgraphClient(url="https://api.thegraph.com/subgraphs/name/cowprotocol/cow")
+
+# Get last 7 days of volume
+volume_data = await client.last_days_volume(days=7)
+
+for daily in volume_data.daily_totals:
+    print(f"Date: {daily.timestamp}")
+    print(f"Volume USD: {daily.volume_usd}")
+```
+
+#### Calculate Total Volume
+
+```python
+# Get 30 days of data
+volume_data = await client.last_days_volume(days=30)
+
+# Calculate total volume
+total_volume = sum(
+    float(day.volume_usd) 
+    for day in volume_data.daily_totals 
+    if day.volume_usd is not None
+)
+
+print(f"30-day volume: ${total_volume:,.2f}")
+```
+
+---
+
+### last_hours_volume
+
+Query the trading volume for the last N hours.
+
+```python
+async def last_hours_volume(self, hours: int, **kwargs: Any) -> LastHoursVolume
+```
+
+<ParamField path="hours" type="int" required>
+  Number of hours of volume data to retrieve
+</ParamField>
+
+<ParamField path="**kwargs" type="Any">
+  Additional keyword arguments to pass to the GraphQL query execution
+</ParamField>
+
+**Returns:** `LastHoursVolume` object containing hourly volume data
+
+<ResponseField name="LastHoursVolume" type="LastHoursVolume">
+  Object containing hourly trading volumes
+  
+  <Expandable title="LastHoursVolume fields">
+    <ResponseField name="hourly_totals" type="List[LastHoursVolumeHourlyTotals]">
+      List of hourly volume records, ordered by timestamp (descending)
+      
+      <Expandable title="LastHoursVolumeHourlyTotals fields">
+        <ResponseField name="timestamp" type="int">
+          Unix timestamp for the hour
+        </ResponseField>
+        
+        <ResponseField name="volume_usd" type="Optional[Any]">
+          Trading volume in USD for that hour
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Usage Example
+
+```python
+# Get last 24 hours of volume
+volume_data = await client.last_hours_volume(hours=24)
+
+for hourly in volume_data.hourly_totals:
+    print(f"Hour: {hourly.timestamp}")
+    print(f"Volume USD: {hourly.volume_usd}")
+```
+
+#### Real-Time Monitoring
+
+```python
+import asyncio
+from datetime import datetime
+
+async def monitor_volume():
+    client = SubgraphClient(url="https://api.thegraph.com/subgraphs/name/cowprotocol/cow")
+    
+    while True:
+        # Get last hour's volume
+        data = await client.last_hours_volume(hours=1)
+        
+        if data.hourly_totals:
+            latest = data.hourly_totals[0]
+            timestamp = datetime.fromtimestamp(latest.timestamp)
+            print(f"[{timestamp}] Volume: ${latest.volume_usd}")
+        
+        # Wait 5 minutes before next check
+        await asyncio.sleep(300)
+
+# Run monitor
+await monitor_volume()
+```
+
+---
+
+### totals
+
+Query aggregate protocol statistics and totals.
+
+```python
+async def totals(self, **kwargs: Any) -> Totals
+```
+
+<ParamField path="**kwargs" type="Any">
+  Additional keyword arguments to pass to the GraphQL query execution
+</ParamField>
+
+**Returns:** `Totals` object containing aggregate protocol statistics
+
+<ResponseField name="Totals" type="Totals">
+  Object containing protocol-wide totals
+  
+  <Expandable title="Totals fields">
+    <ResponseField name="totals" type="List[TotalsTotals]">
+      List of total records (typically contains one record with cumulative stats)
+      
+      <Expandable title="TotalsTotals fields">
+        <ResponseField name="tokens" type="Any">
+          Total number of unique tokens traded
+        </ResponseField>
+        
+        <ResponseField name="orders" type="Any">
+          Total number of orders created
+        </ResponseField>
+        
+        <ResponseField name="traders" type="Any">
+          Total number of unique traders
+        </ResponseField>
+        
+        <ResponseField name="settlements" type="Any">
+          Total number of settlements executed
+        </ResponseField>
+        
+        <ResponseField name="volume_usd" type="Optional[Any]">
+          Total trading volume in USD
+        </ResponseField>
+        
+        <ResponseField name="volume_eth" type="Optional[Any]">
+          Total trading volume in ETH
+        </ResponseField>
+        
+        <ResponseField name="fees_usd" type="Optional[Any]">
+          Total fees collected in USD
+        </ResponseField>
+        
+        <ResponseField name="fees_eth" type="Optional[Any]">
+          Total fees collected in ETH
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Usage Example
+
+```python
+# Get protocol totals
+totals_data = await client.totals()
+
+if totals_data.totals:
+    totals = totals_data.totals[0]
+    
+    print(f"Total Traders: {totals.traders}")
+    print(f"Total Orders: {totals.orders}")
+    print(f"Total Tokens: {totals.tokens}")
+    print(f"Total Settlements: {totals.settlements}")
+    print(f"Total Volume (USD): ${totals.volume_usd}")
+    print(f"Total Volume (ETH): {totals.volume_eth} ETH")
+    print(f"Total Fees (USD): ${totals.fees_usd}")
+    print(f"Total Fees (ETH): {totals.fees_eth} ETH")
+```
+
+#### Protocol Dashboard
+
+```python
+async def display_protocol_stats():
+    client = SubgraphClient(url="https://api.thegraph.com/subgraphs/name/cowprotocol/cow")
+    
+    # Get overall totals
+    totals_data = await client.totals()
+    totals = totals_data.totals[0]
+    
+    # Get recent volume
+    volume_7d = await client.last_days_volume(days=7)
+    recent_volume = sum(
+        float(day.volume_usd) 
+        for day in volume_7d.daily_totals 
+        if day.volume_usd
+    )
+    
+    print("=== CoW Protocol Statistics ===")
+    print(f"All-Time Volume: ${float(totals.volume_usd):,.2f}")
+    print(f"7-Day Volume: ${recent_volume:,.2f}")
+    print(f"Total Traders: {totals.traders:,}")
+    print(f"Total Orders: {totals.orders:,}")
+    print(f"Total Settlements: {totals.settlements:,}")
+    print(f"Unique Tokens: {totals.tokens:,}")
+
+await display_protocol_stats()
+```
+
+## Complete Example
+
+```python
+import asyncio
+from cowdao_cowpy.subgraph.client import SubgraphClient
+
+async def analyze_protocol():
+    # Initialize client
+    client = SubgraphClient(
+        url="https://api.thegraph.com/subgraphs/name/cowprotocol/cow"
+    )
+    
+    # Get various metrics
+    totals = await client.totals()
+    daily_volume = await client.last_days_volume(days=30)
+    hourly_volume = await client.last_hours_volume(hours=24)
+    
+    # Process totals
+    if totals.totals:
+        stats = totals.totals[0]
+        print(f"Protocol Stats:")
+        print(f"  Traders: {stats.traders}")
+        print(f"  Orders: {stats.orders}")
+        print(f"  Volume: ${stats.volume_usd}")
+    
+    # Calculate 30-day volume
+    volume_30d = sum(
+        float(day.volume_usd) 
+        for day in daily_volume.daily_totals 
+        if day.volume_usd
+    )
+    print(f"\n30-Day Volume: ${volume_30d:,.2f}")
+    
+    # Calculate 24-hour volume
+    volume_24h = sum(
+        float(hour.volume_usd) 
+        for hour in hourly_volume.hourly_totals 
+        if hour.volume_usd
+    )
+    print(f"24-Hour Volume: ${volume_24h:,.2f}")
+
+# Run analysis
+await analyze_protocol()
+```
+
+## GraphQL Query Details
+
+The `SubgraphClient` methods execute the following GraphQL queries:
+
+### last_days_volume query
+
+```graphql
+query LastDaysVolume($days: Int!) {
+  dailyTotals(orderBy: timestamp, orderDirection: desc, first: $days) {
+    timestamp
+    volumeUsd
+  }
+}
+```
+
+### last_hours_volume query
+
+```graphql
+query LastHoursVolume($hours: Int!) {
+  hourlyTotals(orderBy: timestamp, orderDirection: desc, first: $hours) {
+    timestamp
+    volumeUsd
+  }
+}
+```
+
+### totals query
+
+```graphql
+query Totals {
+  totals {
+    tokens
+    orders
+    traders
+    settlements
+    volumeUsd
+    volumeEth
+    feesUsd
+    feesEth
+  }
+}
+```

@@ -1,0 +1,514 @@
+---
+title: TWAP Orders
+description: Execute Time-Weighted Average Price strategies to split large orders into smaller parts over time
+---
+
+## Overview
+
+**TWAP (Time-Weighted Average Price)** orders enable you to split a large trade into smaller parts that execute at regular intervals. This strategy helps:
+
+- **Reduce Price Impact** — Avoid moving the market with large orders
+- **Minimize Slippage** — Spread execution risk over time
+- **Dollar-Cost Averaging** — Average out price fluctuations
+- **Stealth Trading** — Execute large positions without revealing full intent
+
+TWAP orders are implemented as composable conditional orders on the ComposableCow framework.
+
+## Creating a TWAP Order
+
+Define your TWAP parameters using the `TwapData` class:
+
+```python creating_twap.py
+from cowdao_cowpy.composable.order_types.twap import (
+    Twap, 
+    TwapData, 
+    StartType, 
+    DurationType
+)
+from cowdao_cowpy.common.chains import Chain
+from web3 import Web3
+
+# Define TWAP parameters
+twap_data = TwapData(
+    sell_token=Web3.to_checksum_address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),  # USDC
+    buy_token=Web3.to_checksum_address("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"),   # WETH
+    receiver=Web3.to_checksum_address("0xYourAddress"),
+    sell_amount=10000000000,  # 10,000 USDC (6 decimals)
+    buy_amount=5000000000000000000,  # 5 WETH minimum (18 decimals)
+    start_type=StartType.AT_MINING_TIME,  # Start when order is mined
+    number_of_parts=10,  # Split into 10 parts
+    time_between_parts=3600,  # 1 hour between each part (in seconds)
+    duration_type=DurationType.AUTO,  # Auto-calculate validity duration
+    app_data="0x" + "0" * 64,  # Optional app-specific data
+    start_time_epoch=0,  # Not used for AT_MINING_TIME
+    duration_of_part=0  # Not used for AUTO duration
+)
+
+# Create the TWAP order
+twap_order = Twap.from_data(twap_data)
+
+# Validate the order
+twap_order.assert_is_valid()
+
+print(f"TWAP Order ID: {twap_order.id}")
+print(f"Parts: {twap_data.number_of_parts}")
+print(f"Amount per part: {twap_data.sell_amount / twap_data.number_of_parts}")
+```
+
+## TWAP Parameters Explained
+
+### Token Configuration
+
+<ParamField path="sell_token" type="str" required>
+  Address of the token you want to sell (must be checksummed)
+</ParamField>
+
+<ParamField path="buy_token" type="str" required>
+  Address of the token you want to buy (must be checksummed)
+</ParamField>
+
+<ParamField path="sell_amount" type="int" required>
+  Total amount to sell across all parts (in token's smallest unit)
+</ParamField>
+
+<ParamField path="buy_amount" type="int" required>
+  Minimum total amount to receive across all parts (in token's smallest unit)
+</ParamField>
+
+### Timing Configuration
+
+<ParamField path="start_type" type="StartType" required>
+  When the TWAP should begin:
+  - `StartType.AT_MINING_TIME` — Start when the order creation transaction is mined
+  - `StartType.AT_EPOCH` — Start at a specific timestamp (set `start_time_epoch`)
+</ParamField>
+
+<ParamField path="number_of_parts" type="int" required>
+  Number of parts to split the order into (must be > 1 and ≤ 2^32)
+</ParamField>
+
+<ParamField path="time_between_parts" type="int" required>
+  Seconds between each part execution (must be > 0 and ≤ 31,536,000 seconds / 1 year)
+</ParamField>
+
+<ParamField path="duration_type" type="DurationType" required>
+  How long each part remains valid:
+  - `DurationType.AUTO` — Valid until next part starts
+  - `DurationType.LIMIT_DURATION` — Custom validity period (set `duration_of_part`)
+</ParamField>
+
+### Optional Parameters
+
+<ParamField path="receiver" type="str" default="order creator">
+  Address to receive the bought tokens
+</ParamField>
+
+<ParamField path="app_data" type="str" default="0x0000...">
+  Custom metadata for the order (32 bytes)
+</ParamField>
+
+<ParamField path="start_time_epoch" type="int" default="0">
+  Unix timestamp for start (only used with `StartType.AT_EPOCH`)
+</ParamField>
+
+<ParamField path="duration_of_part" type="int" default="0">
+  Seconds each part remains valid (only used with `DurationType.LIMIT_DURATION`)
+</ParamField>
+
+## Start Types
+
+### AT_MINING_TIME
+
+The TWAP starts when the order creation transaction is mined:
+
+```python at_mining_time.py
+twap_data = TwapData(
+    # ... other parameters
+    start_type=StartType.AT_MINING_TIME,
+    start_time_epoch=0  # Not used
+)
+
+# The start time is recorded in the "cabinet" storage when created
+```
+
+<Note>
+  The actual start time is determined by the ComposableCow contract and stored in the cabinet. Use the `start_timestamp()` method to retrieve it.
+</Note>
+
+### AT_EPOCH
+
+Schedule the TWAP to start at a specific time:
+
+```python at_epoch.py
+import time
+
+# Start 24 hours from now
+start_time = int(time.time()) + 86400
+
+twap_data = TwapData(
+    # ... other parameters
+    start_type=StartType.AT_EPOCH,
+    start_time_epoch=start_time
+)
+
+print(f"TWAP will start at: {start_time}")
+```
+
+## Duration Types
+
+### AUTO Duration
+
+Each part is valid until the next part starts:
+
+```python auto_duration.py
+twap_data = TwapData(
+    # ... other parameters
+    duration_type=DurationType.AUTO,
+    duration_of_part=0,  # Not used
+    time_between_parts=3600  # Each part valid for 1 hour
+)
+
+# Part 1: Valid from hour 0 to hour 1
+# Part 2: Valid from hour 1 to hour 2
+# Part 3: Valid from hour 2 to hour 3
+# ...
+```
+
+### LIMIT_DURATION
+
+Set a custom validity period for each part:
+
+```python limit_duration.py
+twap_data = TwapData(
+    # ... other parameters
+    duration_type=DurationType.LIMIT_DURATION,
+    time_between_parts=3600,  # Parts start 1 hour apart
+    duration_of_part=1800  # Each part valid for only 30 minutes
+)
+
+# Part 1: Valid from 0:00 to 0:30 (30 min window)
+# Part 2: Valid from 1:00 to 1:30 (30 min window)
+# Part 3: Valid from 2:00 to 2:30 (30 min window)
+# ...
+```
+
+<Warning>
+  The `duration_of_part` must be ≤ `time_between_parts` or the order will be invalid.
+</Warning>
+
+## Submitting a TWAP Order
+
+Generate calldata to create the TWAP on-chain:
+
+```python submit_twap.py
+from cowdao_cowpy.composable.order_types.twap import Twap
+from web3 import Web3, Account
+
+# Create TWAP order
+twap_order = Twap.from_data(twap_data)
+
+# Get creation calldata
+create_calldata = twap_order.create_calldata
+
+# Submit to ComposableCow contract
+composable_cow_address = Web3.to_checksum_address("0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74")
+provider = Web3(Web3.HTTPProvider("https://rpc.ankr.com/eth"))
+account = Account.from_key("YOUR_PRIVATE_KEY")
+
+# Build transaction
+tx = {
+    'from': account.address,
+    'to': composable_cow_address,
+    'data': create_calldata,
+    'gas': 500000,
+    'gasPrice': provider.eth.gas_price,
+    'nonce': provider.eth.get_transaction_count(account.address),
+    'chainId': 1
+}
+
+# Sign and send
+signed_tx = account.sign_transaction(tx)
+tx_hash = provider.eth.send_raw_transaction(signed_tx.rawTransaction)
+
+print(f"Transaction hash: {tx_hash.hex()}")
+print(f"TWAP Order ID: {twap_order.id}")
+```
+
+## Monitoring TWAP Execution
+
+Poll the TWAP to check if the current part is ready:
+
+```python monitor_twap.py
+import asyncio
+from cowdao_cowpy.composable.types import PollParams, PollResultCode
+from cowdao_cowpy.order_book.api import OrderBookApi
+from web3 import AsyncWeb3
+
+async def monitor_twap(twap_order, owner_address, chain):
+    provider = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider("https://rpc.ankr.com/eth"))
+    order_book_api = OrderBookApi()
+    
+    poll_params = PollParams(
+        owner=owner_address,
+        chain=chain,
+        provider=provider,
+        order_book_api=order_book_api
+    )
+    
+    while True:
+        result = await twap_order.poll(poll_params)
+        
+        if result.result == PollResultCode.SUCCESS:
+            print(f"✅ Part ready to execute!")
+            print(f"Order: {result.order}")
+            print(f"Signature: {result.signature}")
+            # Submit to CoW Protocol API
+            break
+        
+        elif result.result == PollResultCode.TRY_AT_EPOCH:
+            next_time = result.epoch
+            print(f"⏳ Next part starts at epoch {next_time}")
+            # Sleep until next part
+            await asyncio.sleep(max(0, next_time - int(time.time())))
+        
+        elif result.result == PollResultCode.DONT_TRY_AGAIN:
+            print(f"❌ TWAP completed or invalid: {result.reason}")
+            break
+        
+        else:
+            print(f"⚠️ {result.reason}")
+            await asyncio.sleep(60)  # Retry in 1 minute
+
+await monitor_twap(twap_order, "0xYourAddress", Chain.MAINNET)
+```
+
+## TWAP Status and Validation
+
+Check TWAP status and timing:
+
+```python twap_status.py
+import asyncio
+from cowdao_cowpy.composable.types import OwnerParams
+from web3 import AsyncWeb3
+
+async def check_twap_status(twap_order, owner_address, chain):
+    provider = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider("https://rpc.ankr.com/eth"))
+    
+    params = OwnerParams(
+        owner=owner_address,
+        chain=chain,
+        provider=provider
+    )
+    
+    # Check authorization
+    is_authorized = await twap_order.is_authorized(params)
+    print(f"Authorized: {is_authorized}")
+    
+    # Get start timestamp
+    poll_params = PollParams(
+        owner=owner_address,
+        chain=chain,
+        provider=provider,
+        order_book_api=OrderBookApi()
+    )
+    
+    start_ts = await twap_order.start_timestamp(poll_params)
+    end_ts = twap_order.end_timestamp(start_ts)
+    
+    print(f"Start time: {start_ts}")
+    print(f"End time: {end_ts}")
+    print(f"Duration: {end_ts - start_ts} seconds")
+    
+    # Validate order
+    validation = twap_order.is_valid()
+    if validation.is_valid:
+        print("✅ Order is valid")
+    else:
+        print(f"❌ Order invalid: {validation.reason}")
+
+await check_twap_status(twap_order, "0xYourAddress", Chain.MAINNET)
+```
+
+## Understanding TWAP Parts
+
+The SDK automatically splits your order into equal parts:
+
+```python twap_parts_calculation.py
+from decimal import Decimal
+
+# Total amounts
+total_sell = 10000000000  # 10,000 USDC
+total_buy = 5000000000000000000  # 5 WETH
+number_of_parts = 10
+
+# Per-part amounts
+part_sell_amount = Decimal(total_sell) // Decimal(number_of_parts)
+part_buy_amount = Decimal(total_buy) // Decimal(number_of_parts)
+
+print(f"Total sell: {total_sell}")
+print(f"Sell per part: {part_sell_amount}")
+print(f"Total buy: {total_buy}")
+print(f"Buy per part: {part_buy_amount}")
+
+# Output:
+# Total sell: 10000000000
+# Sell per part: 1000000000  (1,000 USDC per part)
+# Total buy: 5000000000000000000
+# Buy per part: 500000000000000000  (0.5 WETH per part)
+```
+
+## Canceling or Removing a TWAP
+
+Remove a TWAP order before it completes:
+
+```python cancel_twap.py
+from web3 import Web3, Account
+
+# Get removal calldata
+remove_calldata = twap_order.remove_calldata
+
+# Submit to ComposableCow contract
+composable_cow_address = Web3.to_checksum_address("0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74")
+provider = Web3(Web3.HTTPProvider("https://rpc.ankr.com/eth"))
+account = Account.from_key("YOUR_PRIVATE_KEY")
+
+tx = {
+    'from': account.address,
+    'to': composable_cow_address,
+    'data': remove_calldata,
+    'gas': 200000,
+    'gasPrice': provider.eth.gas_price,
+    'nonce': provider.eth.get_transaction_count(account.address),
+    'chainId': 1
+}
+
+signed_tx = account.sign_transaction(tx)
+tx_hash = provider.eth.send_raw_transaction(signed_tx.rawTransaction)
+
+print(f"TWAP removed: {tx_hash.hex()}")
+```
+
+## Serialization and Deserialization
+
+Save and restore TWAP orders:
+
+```python twap_serialization.py
+from eth_typing import HexStr
+
+# Serialize TWAP to hex string
+serialized = twap_order.serialize()
+print(f"Serialized: {serialized}")
+
+# Deserialize back to TWAP object
+restored_twap = Twap.deserialize(serialized)
+
+print(f"Original ID: {twap_order.id}")
+print(f"Restored ID: {restored_twap.id}")
+assert twap_order.id == restored_twap.id
+
+# Convert to human-readable string
+twap_string = twap_order.to_string()
+print(twap_string)
+# Output: twap (0x...): {"sellAmount": "10000000000", "sellToken": "0x...", ...}
+```
+
+## Complete Example
+
+Here's a full example creating and monitoring a TWAP:
+
+```python complete_twap_example.py
+import asyncio
+import os
+import time
+from web3 import Web3, Account, AsyncWeb3
+from cowdao_cowpy.composable.order_types.twap import (
+    Twap, TwapData, StartType, DurationType
+)
+from cowdao_cowpy.composable.types import PollParams
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.common.chains import Chain
+
+async def main():
+    # Configuration
+    USDC = Web3.to_checksum_address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
+    WETH = Web3.to_checksum_address("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+    account = Account.from_key(os.getenv("PRIVATE_KEY"))
+    
+    # Create TWAP: Sell 10,000 USDC for WETH over 10 hours
+    twap_data = TwapData(
+        sell_token=USDC,
+        buy_token=WETH,
+        receiver=account.address,
+        sell_amount=10000 * 10**6,  # 10,000 USDC
+        buy_amount=4 * 10**18,  # Minimum 4 WETH total
+        start_type=StartType.AT_MINING_TIME,
+        number_of_parts=10,
+        time_between_parts=3600,  # 1 hour
+        duration_type=DurationType.AUTO,
+        app_data="0x" + "0" * 64
+    )
+    
+    twap = Twap.from_data(twap_data)
+    twap.assert_is_valid()
+    
+    print(f"Created TWAP Order: {twap.id}")
+    print(f"Each part sells: {twap_data.sell_amount / twap_data.number_of_parts / 10**6} USDC")
+    
+    # Monitor for execution
+    provider = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider("https://rpc.ankr.com/eth"))
+    
+    poll_params = PollParams(
+        owner=account.address,
+        chain=Chain.MAINNET,
+        provider=provider,
+        order_book_api=OrderBookApi()
+    )
+    
+    result = await twap.poll(poll_params)
+    print(f"Poll result: {result.result}")
+    print(f"Reason: {result.reason if hasattr(result, 'reason') else 'Success'}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose Appropriate Part Counts">
+    More parts = better price averaging but higher gas costs. For mainnet, 5-20 parts is typically optimal.
+  </Accordion>
+  
+  <Accordion title="Set Realistic Price Limits">
+    The `buy_amount` is divided across all parts. Ensure each part's limit price is achievable.
+  </Accordion>
+  
+  <Accordion title="Consider Market Hours">
+    Schedule TW APs during liquid trading periods to ensure parts can be filled.
+  </Accordion>
+  
+  <Accordion title="Monitor Cabinet Storage">
+    For `AT_MINING_TIME` orders, the start timestamp is stored in the cabinet. Check authorization before polling.
+  </Accordion>
+  
+  <Accordion title="Test on Testnets">
+    Always test TWAP strategies on Sepolia or Gnosis Chain testnet first.
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Composable Orders" icon="cube" href="/advanced/composable-orders">
+    Learn about the ConditionalOrder framework
+  </Card>
+  <Card title="Multi-Chain Trading" icon="link" href="/advanced/multi-chain">
+    Execute TWAPs across different chains
+  </Card>
+  <Card title="Order Management" icon="list-check" href="/guides/managing-orders">
+    Create and manage orders via API
+  </Card>
+  <Card title="TWAP API" icon="file-code" href="/api/composable">
+    TWAP order API reference
+  </Card>
+</CardGroup>

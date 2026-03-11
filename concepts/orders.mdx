@@ -1,0 +1,310 @@
+---
+title: 'Orders'
+description: 'Understanding order structure, types, and lifecycle in the CoW Protocol'
+---
+
+## Overview
+
+Orders are the fundamental building blocks of trading on CoW Protocol. An order represents an intent to trade one token for another, specifying the terms and conditions of the desired trade.
+
+## Order Structure
+
+The `Order` dataclass contains all the information needed to describe a trade intent:
+
+```python
+from cowdao_cowpy.contracts.order import Order
+
+order = Order(
+    sell_token="0x...",           # Address of token to sell
+    buy_token="0x...",            # Address of token to buy
+    receiver="0x...",             # Address to receive bought tokens
+    sell_amount="1000000000",     # Amount of sell token
+    buy_amount="2000000000",      # Amount of buy token desired
+    valid_to=1234567890,          # Unix timestamp when order expires
+    app_data="0x...",             # Application-specific metadata
+    fee_amount="0",               # Protocol fee (usually 0 for CoW Swap)
+    kind="sell",                  # Order type: "sell" or "buy"
+    partially_fillable=False,     # Whether order can be partially filled
+    sell_token_balance="erc20",   # How to withdraw sell token
+    buy_token_balance="erc20",    # How to receive buy token
+)
+```
+
+### Core Fields
+
+<CardGroup cols={2}>
+  <Card title="sell_token" icon="arrow-right-from-bracket">
+    The ERC20 token address you want to sell. Must be a checksummed Ethereum address.
+  </Card>
+
+  <Card title="buy_token" icon="arrow-right-to-bracket">
+    The ERC20 token address you want to receive. Must be a checksummed Ethereum address.
+  </Card>
+
+  <Card title="sell_amount" icon="hashtag">
+    For sell orders: exact amount to sell. For buy orders: maximum amount willing to sell.
+  </Card>
+
+  <Card title="buy_amount" icon="hashtag">
+    For buy orders: exact amount to buy. For sell orders: minimum amount willing to receive.
+  </Card>
+
+  <Card title="receiver" icon="wallet">
+    Address that will receive the bought tokens. If different from the order signer, tokens are sent here instead.
+  </Card>
+
+  <Card title="valid_to" icon="clock">
+    Unix timestamp when the order expires. After this time, the order cannot be executed.
+  </Card>
+</CardGroup>
+
+<Note>
+  All token amounts in orders are represented as strings to handle large integers without precision loss.
+</Note>
+
+## Order Types
+
+CoW Protocol supports two main order types through the `OrderKind` enum:
+
+### Sell Orders
+
+A sell order specifies the exact amount of tokens you want to sell:
+
+```python
+from cowdao_cowpy.contracts.order import Order, OrderKind
+
+sell_order = Order(
+    sell_token=USDC_ADDRESS,
+    buy_token=WETH_ADDRESS,
+    sell_amount="1000000000",  # Sell exactly 1000 USDC
+    buy_amount="500000000",    # Receive at least 0.5 WETH
+    kind=OrderKind.SELL.value,
+    # ... other fields
+)
+```
+
+<Accordion title="Sell Order Behavior">
+  - **sell_amount**: The exact amount of tokens that will be sold
+  - **buy_amount**: The minimum amount of tokens you're willing to receive
+  - The order fills if the market can provide at least the `buy_amount` for your `sell_amount`
+</Accordion>
+
+### Buy Orders
+
+A buy order specifies the exact amount of tokens you want to receive:
+
+```python
+from cowdao_cowpy.contracts.order import Order, OrderKind
+
+buy_order = Order(
+    sell_token=USDC_ADDRESS,
+    buy_token=WETH_ADDRESS,
+    sell_amount="2000000000",  # Sell at most 2000 USDC
+    buy_amount="1000000000",   # Buy exactly 1 WETH
+    kind=OrderKind.BUY.value,
+    # ... other fields
+)
+```
+
+<Accordion title="Buy Order Behavior">
+  - **buy_amount**: The exact amount of tokens you want to receive
+  - **sell_amount**: The maximum amount of tokens you're willing to pay
+  - The order fills if the market can provide the `buy_amount` for at most your `sell_amount`
+</Accordion>
+
+## Order Balance Types
+
+The `OrderBalance` enum specifies how tokens are transferred:
+
+```python
+from cowdao_cowpy.contracts.order import OrderBalance
+
+# Standard ERC20 transfers (most common)
+order.sell_token_balance = OrderBalance.ERC20.value
+order.buy_token_balance = OrderBalance.ERC20.value
+
+# Use Balancer Vault internal balances
+order.sell_token_balance = OrderBalance.INTERNAL.value
+
+# Use Balancer Vault external balances
+order.sell_token_balance = OrderBalance.EXTERNAL.value
+```
+
+<Info>
+  Most users should use `OrderBalance.ERC20` for both sell and buy token balances. The Balancer Vault options are for advanced integrations.
+</Info>
+
+## Partially Fillable Orders
+
+Orders can be configured to allow partial fills:
+
+```python
+order = Order(
+    # ... other fields
+    partially_fillable=True,  # Allow partial execution
+)
+```
+
+<Accordion title="Partially Fillable Behavior">
+  **When True:**
+  - The order can be filled in multiple transactions
+  - Useful for large orders that may not fill completely in one batch
+  - Each fill reduces the remaining amount
+  
+  **When False (default):**
+  - The order must be filled completely in a single transaction
+  - This is the fill-or-kill behavior
+  - Simpler to reason about for most use cases
+</Accordion>
+
+## Order Lifecycle
+
+<Steps>
+  <Step title="Order Creation">
+    The user creates an order with their trading intent and signs it using EIP-712.
+    
+    ```python
+    from cowdao_cowpy.cow.swap import sign_order
+    from cowdao_cowpy.contracts.domain import domain
+    from cowdao_cowpy.common.constants import CowContractAddress
+    
+    order_domain = domain(
+        chain=Chain.MAINNET,
+        verifying_contract=CowContractAddress.SETTLEMENT_CONTRACT.value
+    )
+    signature = sign_order(chain, account, order)
+    ```
+  </Step>
+
+  <Step title="Order Submission">
+    The signed order is submitted to the CoW Protocol orderbook API.
+    
+    ```python
+    from cowdao_cowpy.order_book.api import OrderBookApi
+    from cowdao_cowpy.order_book.generated.model import OrderCreation
+    
+    order_creation = OrderCreation(
+        from_=account.address,
+        sellToken=order.sellToken,
+        buyToken=order.buyToken,
+        sellAmount=str(order.sellAmount),
+        buyAmount=str(order.buyAmount),
+        validTo=order.validTo,
+        # ... other fields
+    )
+    order_uid = await order_book_api.post_order(order_creation)
+    ```
+  </Step>
+
+  <Step title="Order Matching">
+    Solvers compete to find the best execution for orders in a batch auction. They:
+    - Match orders with each other (Coincidence of Wants)
+    - Route through DEX liquidity if needed
+    - Optimize for best prices and minimal slippage
+  </Step>
+
+  <Step title="Order Settlement">
+    The winning solver's solution is executed on-chain, settling all matched orders atomically in a single transaction.
+  </Step>
+
+  <Step title="Order Completion or Expiry">
+    - **Filled**: Order successfully executed, tokens transferred
+    - **Expired**: Order's `valid_to` timestamp passed without execution
+    - **Cancelled**: User explicitly cancelled the order before execution
+  </Step>
+</Steps>
+
+## Order UID
+
+Each order has a unique identifier (UID) that combines the order hash, owner, and validity:
+
+```python
+from cowdao_cowpy.contracts.order import compute_order_uid
+from cowdao_cowpy.contracts.domain import domain
+
+order_domain = domain(chain=Chain.MAINNET, verifying_contract=SETTLEMENT_CONTRACT)
+order_uid = compute_order_uid(order_domain, order, owner_address)
+
+print(f"Order UID: {order_uid}")
+# Output: Order UID: 0x123abc...def789
+```
+
+<Note>
+  The order UID is 56 bytes (112 hex characters) and can be used to query order status, track execution, and cancel orders.
+</Note>
+
+## App Data
+
+The `app_data` field allows applications to attach metadata to orders:
+
+```python
+from cowdao_cowpy.app_data.utils import DEFAULT_APP_DATA_HASH
+
+order = Order(
+    # ... other fields
+    app_data=DEFAULT_APP_DATA_HASH,  # Use default
+)
+```
+
+<Accordion title="App Data Use Cases">
+  - Application identification
+  - Referral tracking
+  - Order uniqueness (prevent duplicate orders)
+  - Custom metadata for specialized integrations
+  
+  The app data is hashed to a 32-byte value and can reference IPFS content for rich metadata.
+</Accordion>
+
+## Fee Structure
+
+CoW Protocol offers gasless trading where fees are paid in the sell token:
+
+```python
+order = Order(
+    # ... other fields
+    fee_amount="0",  # CoW Swap charges no additional fees
+)
+```
+
+<Info>
+  The actual execution cost is incorporated into the quoted price. The protocol finds surplus for users and covers gas costs, making trading more efficient than traditional DEXs.
+</Info>
+
+## Example: Complete Order Flow
+
+```python
+import asyncio
+from web3 import Account, Web3
+from web3.types import Wei
+from cowdao_cowpy.cow.swap import swap_tokens
+from cowdao_cowpy.common.chains import Chain
+
+async def create_and_execute_order():
+    # Setup
+    account = Account.from_key(PRIVATE_KEY)
+    
+    # Token addresses
+    sell_token = Web3.to_checksum_address("0xbe72E441BF55620febc26715db68d3494213D8Cb")
+    buy_token = Web3.to_checksum_address("0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14")
+    
+    # Execute swap (internally creates, signs, and submits order)
+    result = await swap_tokens(
+        amount=Wei(1000000000),
+        account=account,
+        chain=Chain.SEPOLIA,
+        sell_token=sell_token,
+        buy_token=buy_token,
+        slippage_tolerance=0.005,  # 0.5% slippage
+        partially_fillable=False,
+    )
+    
+    print(f"Order submitted successfully!")
+    print(f"Order UID: {result.uid}")
+    print(f"Track at: {result.url}")
+
+asyncio.run(create_and_execute_order())
+```
+
+<Note>
+  The `swap_tokens` function handles the entire order lifecycle: getting a quote, creating the order, signing it, and submitting it to the orderbook.
+</Note>

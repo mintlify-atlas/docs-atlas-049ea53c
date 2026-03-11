@@ -1,80 +1,293 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with the CoW Protocol Python SDK by executing your first token swap
+icon: rocket
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
+This guide will walk you through creating and executing a token swap on CoW Protocol using the Python SDK. You'll learn how to swap tokens with built-in MEV protection and gasless trading.
 
-### Step 1: Set up your local environment
+<Info>
+  CoW Protocol uses batch auctions to protect traders from MEV (Maximal Extractable Value) and provides the best execution prices by aggregating liquidity across multiple DEXs.
+</Info>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- Installed the CoW Protocol Python SDK (see [Installation](/installation))
+- A wallet with some test tokens (we'll use Sepolia testnet)
+- Your wallet's private key
+- Approved the CoW Protocol Vault Relayer to spend your tokens
+
+<Warning>
+  **Important**: Before executing a swap, you must approve the CoW Protocol Vault Relayer contract to spend your sell token. The Vault Relayer address can be accessed via `CowContractAddress.VAULT_RELAYER`.
+</Warning>
+
+## Environment Setup
+
+<Steps>
+  <Step title="Create Environment File">
+    Create a `.env` file in your project root to store your private key:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```bash .env
+    PRIVATE_KEY=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+    ```
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    <Note>
+      Make sure to add `.env` to your `.gitignore` file to prevent accidentally committing your private key.
+    </Note>
+  </Step>
+  
+  <Step title="Install python-dotenv">
+    Install the `python-dotenv` package to load environment variables:
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash
+    pip install python-dotenv
+    ```
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Complete Swap Example
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Here's a complete example of swapping tokens on the Sepolia testnet:
 
-### Step 3: Go live
+```python
+import os
+import asyncio
+from dotenv import load_dotenv
+from web3 import Account, Web3
+from web3.types import Wei
+from cowdao_cowpy.cow.swap import swap_tokens
+from cowdao_cowpy.common.chains import Chain
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+# Token addresses (Sepolia testnet)
+BUY_TOKEN = Web3.to_checksum_address(
+    "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14"
+)  # WETH
+SELL_TOKEN = Web3.to_checksum_address(
+    "0xbe72E441BF55620febc26715db68d3494213D8Cb"
+)  # USDC
 
-## Next steps
+# Swap 50 USDC (with 18 decimals)
+SELL_AMOUNT_BEFORE_FEE = Wei(5000000000000000000)
 
-Now that you have your docs running, explore these key features:
+# Use Sepolia testnet
+CHAIN = Chain.SEPOLIA
 
-<CardGroup cols={2}>
+# Load environment variables
+load_dotenv()
+PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+if not PRIVATE_KEY:
+    raise ValueError("Missing PRIVATE_KEY in .env file")
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+# Create account from private key
+ACCOUNT = Account.from_key(PRIVATE_KEY)
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+# Execute the swap
+async def main():
+    result = await swap_tokens(
+        amount=SELL_AMOUNT_BEFORE_FEE,
+        account=ACCOUNT,
+        chain=CHAIN,
+        sell_token=SELL_TOKEN,
+        buy_token=BUY_TOKEN,
+    )
+    print(f"Order created successfully!")
+    print(f"Order UID: {result.uid}")
+    print(f"Order URL: {result.url}")
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+if __name__ == "__main__":
+    asyncio.run(main())
+```
 
-</CardGroup>
+## Understanding the Code
+
+Let's break down the key components:
+
+<Steps>
+  <Step title="Import Dependencies">
+    ```python
+    from web3 import Account, Web3
+    from web3.types import Wei
+    from cowdao_cowpy.cow.swap import swap_tokens
+    from cowdao_cowpy.common.chains import Chain
+    ```
+    
+    The SDK uses `web3.py` for Ethereum interactions and provides a simple `swap_tokens` function for executing swaps.
+  </Step>
+  
+  <Step title="Configure Token Addresses">
+    ```python
+    BUY_TOKEN = Web3.to_checksum_address(
+        "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14"
+    )  # WETH
+    SELL_TOKEN = Web3.to_checksum_address(
+        "0xbe72E441BF55620febc26715db68d3494213D8Cb"
+    )  # USDC
+    ```
+    
+    Always use checksummed addresses to avoid errors. The `Web3.to_checksum_address()` function ensures addresses are properly formatted.
+  </Step>
+  
+  <Step title="Specify Sell Amount">
+    ```python
+    SELL_AMOUNT_BEFORE_FEE = Wei(5000000000000000000)
+    ```
+    
+    Amounts are specified in the token's smallest unit (wei for 18 decimal tokens). In this example, we're selling 50 tokens with 18 decimals.
+    
+    <Tip>
+      Use `Web3.to_wei()` for easier conversion: `Web3.to_wei(50, 'ether')` equals 50 tokens with 18 decimals.
+    </Tip>
+  </Step>
+  
+  <Step title="Select Network">
+    ```python
+    CHAIN = Chain.SEPOLIA
+    ```
+    
+    The SDK supports multiple networks:
+    - `Chain.MAINNET` - Ethereum Mainnet
+    - `Chain.GNOSIS` - Gnosis Chain
+    - `Chain.SEPOLIA` - Sepolia Testnet
+    - `Chain.ARBITRUM_ONE` - Arbitrum One
+    - `Chain.BASE` - Base
+    - `Chain.POLYGON` - Polygon
+    - `Chain.AVALANCHE` - Avalanche
+    - `Chain.BNB` - BNB Chain
+    - `Chain.LENS` - Lens Network
+  </Step>
+  
+  <Step title="Execute the Swap">
+    ```python
+    result = await swap_tokens(
+        amount=SELL_AMOUNT_BEFORE_FEE,
+        account=ACCOUNT,
+        chain=CHAIN,
+        sell_token=SELL_TOKEN,
+        buy_token=BUY_TOKEN,
+    )
+    ```
+    
+    The `swap_tokens` function handles:
+    - Getting a quote from CoW Protocol
+    - Creating and signing the order
+    - Submitting the order to the orderbook
+    - Returning the order UID and explorer URL
+  </Step>
+</Steps>
+
+## Advanced Options
+
+The `swap_tokens` function supports additional parameters for more control:
+
+```python
+result = await swap_tokens(
+    amount=SELL_AMOUNT_BEFORE_FEE,
+    account=ACCOUNT,
+    chain=CHAIN,
+    sell_token=SELL_TOKEN,
+    buy_token=BUY_TOKEN,
+    slippage_tolerance=0.01,  # 1% slippage (default: 0.5%)
+    partially_fillable=False,  # Allow partial fills (default: False)
+    valid_to=None,  # Order expiry timestamp (default: uses quote expiry)
+    env="prod"  # Environment: "prod", "staging", or "barn" (default: "prod")
+)
+```
+
+<Info>
+  **Slippage Tolerance**: Protects you from price changes between order creation and execution. A 1% slippage means you'll accept up to 1% less than the quoted amount.
+</Info>
+
+## Working with Safe Wallets
+
+To create orders from a Safe (Gnosis Safe) wallet:
+
+```python
+from eth_typing.evm import ChecksumAddress
+
+safe_address = Web3.to_checksum_address("0x...")
+
+result = await swap_tokens(
+    amount=SELL_AMOUNT_BEFORE_FEE,
+    account=ACCOUNT,  # Signer account
+    chain=CHAIN,
+    sell_token=SELL_TOKEN,
+    buy_token=BUY_TOKEN,
+    safe_address=safe_address,  # Safe wallet address
+)
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  When using a Safe wallet, the order uses pre-signature validation. The `account` parameter should be one of the Safe owners who will sign the transaction.
 </Note>
+
+## Fetching Order Information
+
+After creating an order, you can fetch its details using the OrderBook API:
+
+```python
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.order_book.generated.model import UID
+
+# Initialize API client
+order_book_api = OrderBookApi()
+
+# Fetch order by UID
+order = await order_book_api.get_order_by_uid(
+    UID("0x...your-order-uid...")
+)
+
+print(f"Order status: {order.status}")
+print(f"Sell amount: {order.sellAmount}")
+print(f"Buy amount: {order.buyAmount}")
+```
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Insufficient Token Balance">
+    Ensure your wallet has enough of the sell token to execute the swap. Remember to account for token decimals when checking balances.
+  </Accordion>
+  
+  <Accordion title="Missing Token Approval">
+    Before swapping, you must approve the CoW Protocol Vault Relayer to spend your tokens:
+    
+    ```python
+    from cowdao_cowpy.common.constants import CowContractAddress
+    
+    # Get the Vault Relayer address
+    vault_relayer = CowContractAddress.VAULT_RELAYER.value
+    
+    # Use your token contract to approve spending
+    # (Implementation depends on your web3 setup)
+    ```
+  </Accordion>
+  
+  <Accordion title="Order Not Executing">
+    Orders may take time to execute as CoW Protocol uses batch auctions. Check the order status using the explorer URL returned by `swap_tokens()`. Orders that don't find a match within their validity period will expire.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Order Management" icon="list" href="/guides/managing-orders">
+    Learn how to fetch, monitor, and cancel orders
+  </Card>
+  
+  <Card title="Advanced Features" icon="wand-magic-sparkles" href="/advanced/composable-orders">
+    Explore composable orders and TWAP strategies
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/swap">
+    Browse the complete API documentation
+  </Card>
+  
+  <Card title="Contract Interaction" icon="file-contract" href="/guides/contract-interaction">
+    Learn how to interact with CoW Protocol smart contracts
+  </Card>
+</CardGroup>

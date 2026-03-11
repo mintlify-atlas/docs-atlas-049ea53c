@@ -1,0 +1,608 @@
+---
+title: "OrderBookApi"
+description: "Client for interacting with the CoW Protocol Order Book API"
+---
+
+## OrderBookApi
+
+The `OrderBookApi` class provides methods to interact with the CoW Protocol Order Book API, including posting orders, getting quotes, retrieving trades, and more.
+
+```python
+class OrderBookApi(ApiBase):
+    def __init__(
+        self,
+        config=OrderBookAPIConfigFactory.get_config("prod", SupportedChainId.MAINNET),
+    )
+```
+
+### Constructor Parameters
+
+<ParamField path="config" type="OrderBookAPIConfig" default="OrderBookAPIConfigFactory.get_config('prod', SupportedChainId.MAINNET)">
+  Configuration object specifying the API endpoint and chain. Use `OrderBookAPIConfigFactory.get_config(env, chain_id)` to create configurations.
+</ParamField>
+
+### Initialization Example
+
+```python
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.order_book.config import OrderBookAPIConfigFactory
+from cowdao_cowpy.common.config import SupportedChainId
+
+# Initialize for mainnet production
+api = OrderBookApi(
+    OrderBookAPIConfigFactory.get_config("prod", SupportedChainId.MAINNET)
+)
+
+# Initialize for Gnosis Chain
+api_gnosis = OrderBookApi(
+    OrderBookAPIConfigFactory.get_config("prod", SupportedChainId.GNOSIS_CHAIN)
+)
+
+# Initialize for staging environment
+api_staging = OrderBookApi(
+    OrderBookAPIConfigFactory.get_config("staging", SupportedChainId.MAINNET)
+)
+```
+
+## Methods
+
+### get_version
+
+Get the API version.
+
+```python
+async def get_version(self, context_override: Context = {}) -> str
+```
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** The API version string
+
+**Example:**
+```python
+version = await api.get_version()
+print(f"API Version: {version}")
+```
+
+---
+
+### post_order
+
+Submit a new order to the order book.
+
+```python
+async def post_order(
+    self, 
+    order: OrderCreation, 
+    context_override: Context = {}
+) -> UID
+```
+
+<ParamField path="order" type="OrderCreation" required>
+  The order details including tokens, amounts, signature, and signing scheme
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** The unique order identifier (UID)
+
+**Example:**
+```python
+from cowdao_cowpy.order_book.generated.model import OrderCreation
+
+order_creation = OrderCreation(
+    from_=account.address,
+    sellToken=sell_token,
+    buyToken=buy_token,
+    sellAmount="1000000000000000000",
+    buyAmount="2000000000000000000",
+    validTo=1234567890,
+    kind="sell",
+    partiallyFillable=False,
+    appData="0x" + "0" * 64,
+    signature=signature.to_string(),
+    signingScheme="eip712",
+    receiver=account.address,
+)
+
+order_uid = await api.post_order(order_creation)
+print(f"Order UID: {order_uid}")
+```
+
+---
+
+### post_quote
+
+Request a quote for a potential order.
+
+```python
+async def post_quote(
+    self,
+    request: OrderQuoteRequest,
+    side: Union[OrderQuoteSide, OrderQuoteSide1, OrderQuoteSide2, OrderQuoteSide3],
+    validity: Union[OrderQuoteValidity, OrderQuoteValidity1, OrderQuoteValidity2] = OrderQuoteValidity1(validTo=None),
+    context_override: Context = {},
+) -> OrderQuoteResponse
+```
+
+<ParamField path="request" type="OrderQuoteRequest" required>
+  Quote request containing sell/buy tokens and the account address
+</ParamField>
+
+<ParamField path="side" type="Union[OrderQuoteSide, OrderQuoteSide1, OrderQuoteSide2, OrderQuoteSide3]" required>
+  The side of the order (sell or buy) with amount details
+</ParamField>
+
+<ParamField path="validity" type="Union[OrderQuoteValidity, OrderQuoteValidity1, OrderQuoteValidity2]" default="OrderQuoteValidity1(validTo=None)">
+  Validity configuration for the quote
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** An `OrderQuoteResponse` containing the quote details including buy/sell amounts and fees
+
+**Example:**
+```python
+from cowdao_cowpy.order_book.generated.model import (
+    OrderQuoteRequest,
+    OrderQuoteSide1,
+    OrderQuoteSideKindSell,
+    TokenAmount,
+)
+
+# Request quote for selling tokens
+quote_request = OrderQuoteRequest(
+    sellToken=sell_token_address,
+    buyToken=buy_token_address,
+    from_=account.address,
+)
+
+quote_side = OrderQuoteSide1(
+    kind=OrderQuoteSideKindSell.sell,
+    sellAmountBeforeFee=TokenAmount("1000000000000000000"),
+)
+
+quote = await api.post_quote(quote_request, quote_side)
+print(f"Buy amount: {quote.quote.buyAmount}")
+print(f"Valid until: {quote.quote.validTo}")
+```
+
+---
+
+### get_order_by_uid
+
+Retrieve order details by its unique identifier.
+
+```python
+async def get_order_by_uid(
+    self, 
+    order_uid: UID, 
+    context_override: Context = {}
+) -> Order
+```
+
+<ParamField path="order_uid" type="UID" required>
+  The unique order identifier
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** The `Order` object with all order details
+
+**Example:**
+```python
+order = await api.get_order_by_uid(order_uid)
+print(f"Status: {order.status}")
+print(f"Sell token: {order.sellToken}")
+print(f"Buy token: {order.buyToken}")
+```
+
+---
+
+### get_orders_by_owner
+
+Retrieve all orders for a specific owner address.
+
+```python
+async def get_orders_by_owner(
+    self,
+    owner: Address,
+    limit: int = 1000,
+    offset: int = 0,
+    context_override: Context = {},
+) -> List[Order]
+```
+
+<ParamField path="owner" type="Address" required>
+  The Ethereum address of the order owner
+</ParamField>
+
+<ParamField path="limit" type="int" default="1000">
+  Maximum number of orders to return
+</ParamField>
+
+<ParamField path="offset" type="int" default="0">
+  Number of orders to skip (for pagination)
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** List of `Order` objects
+
+**Example:**
+```python
+from web3 import Web3
+
+owner_address = Web3.to_checksum_address("0x...")
+orders = await api.get_orders_by_owner(owner_address, limit=50)
+
+for order in orders:
+    print(f"Order {order.uid}: {order.status}")
+```
+
+---
+
+### get_trades_by_owner
+
+Retrieve all trades executed by a specific owner.
+
+```python
+async def get_trades_by_owner(
+    self, 
+    owner: Address, 
+    context_override: Context = {}
+) -> List[Trade]
+```
+
+<ParamField path="owner" type="Address" required>
+  The Ethereum address of the trader
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** List of `Trade` objects
+
+**Example:**
+```python
+trades = await api.get_trades_by_owner(owner_address)
+print(f"Total trades: {len(trades)}")
+
+for trade in trades:
+    print(f"Trade: {trade.buyAmount} {trade.buyToken}")
+```
+
+---
+
+### get_trades_by_order_uid
+
+Retrieve all trades for a specific order.
+
+```python
+async def get_trades_by_order_uid(
+    self, 
+    order_uid: UID, 
+    context_override: Context = {}
+) -> List[Trade]
+```
+
+<ParamField path="order_uid" type="UID" required>
+  The unique order identifier
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** List of `Trade` objects for the order
+
+**Example:**
+```python
+trades = await api.get_trades_by_order_uid(order_uid)
+for trade in trades:
+    print(f"Executed at block: {trade.blockNumber}")
+```
+
+---
+
+### delete_order
+
+Cancel one or more orders.
+
+```python
+async def delete_order(
+    self, 
+    orders_cancelation: OrderCancellations, 
+    context_override: Context = {}
+) -> str
+```
+
+<ParamField path="orders_cancelation" type="OrderCancellations" required>
+  The order cancellation details including signatures
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** Confirmation string
+
+**Example:**
+```python
+from cowdao_cowpy.order_book.generated.model import OrderCancellations
+
+cancellation = OrderCancellations(
+    orderUids=[order_uid],
+    signature=signature,
+    signingScheme="eip712",
+)
+
+result = await api.delete_order(cancellation)
+print(f"Cancellation result: {result}")
+```
+
+---
+
+### get_native_price
+
+Get the native token price for a specific token.
+
+```python
+async def get_native_price(
+    self, 
+    token_address: Address, 
+    context_override: Context = {}
+) -> NativePriceResponse
+```
+
+<ParamField path="token_address" type="Address" required>
+  The address of the token to get the price for
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** `NativePriceResponse` containing the price in native token (ETH/xDAI)
+
+**Example:**
+```python
+price = await api.get_native_price(token_address)
+print(f"Price: {price.price} ETH")
+```
+
+---
+
+### get_total_surplus
+
+Get the total surplus (savings) for a user.
+
+```python
+async def get_total_surplus(
+    self, 
+    user: Address, 
+    context_override: Context = {}
+) -> TotalSurplus
+```
+
+<ParamField path="user" type="Address" required>
+  The user's Ethereum address
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** `TotalSurplus` object with surplus details
+
+**Example:**
+```python
+surplus = await api.get_total_surplus(user_address)
+print(f"Total surplus: {surplus.totalSurplus}")
+```
+
+---
+
+### get_tx_orders
+
+Get all orders included in a specific transaction.
+
+```python
+async def get_tx_orders(
+    self, 
+    tx_hash: TransactionHash, 
+    context_override: Context = {}
+) -> List[Order]
+```
+
+<ParamField path="tx_hash" type="TransactionHash" required>
+  The transaction hash
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** List of orders in the transaction
+
+**Example:**
+```python
+tx_hash = "0xabc123..."
+orders = await api.get_tx_orders(tx_hash)
+print(f"Orders in transaction: {len(orders)}")
+```
+
+---
+
+### get_solver_competition
+
+Get solver competition details for a specific auction.
+
+```python
+async def get_solver_competition(
+    self, 
+    action_id: Union[int, str] = "latest", 
+    context_override: Context = {}
+) -> SolverCompetitionResponse
+```
+
+<ParamField path="action_id" type="Union[int, str]" default="latest">
+  The auction ID or "latest" for the most recent auction
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** `SolverCompetitionResponse` with competition details
+
+**Example:**
+```python
+competition = await api.get_solver_competition("latest")
+print(f"Winning solver: {competition.winningSolver}")
+```
+
+---
+
+### get_solver_competition_by_tx_hash
+
+Get solver competition details by transaction hash.
+
+```python
+async def get_solver_competition_by_tx_hash(
+    self, 
+    tx_hash: TransactionHash, 
+    context_override: Context = {}
+) -> SolverCompetitionResponse
+```
+
+<ParamField path="tx_hash" type="TransactionHash" required>
+  The transaction hash
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** `SolverCompetitionResponse` with competition details
+
+---
+
+### get_order_link
+
+Generate an API link for an order (not an explorer link).
+
+```python
+def get_order_link(self, order_uid: UID) -> str
+```
+
+<ParamField path="order_uid" type="UID" required>
+  The unique order identifier
+</ParamField>
+
+**Returns:** API endpoint URL for the order
+
+**Example:**
+```python
+api_link = api.get_order_link(order_uid)
+print(f"API endpoint: {api_link}")
+# Output: https://api.cow.fi/mainnet/api/v1/orders/0x...
+```
+
+---
+
+### put_app_data
+
+Upload app data to the API.
+
+```python
+async def put_app_data(
+    self,
+    app_data: AppDataObject,
+    app_data_hash: AppDataHash = None,
+    context_override: Context = {},
+) -> AppDataHash
+```
+
+<ParamField path="app_data" type="AppDataObject" required>
+  The application data object to upload
+</ParamField>
+
+<ParamField path="app_data_hash" type="AppDataHash" default="None">
+  Optional pre-computed app data hash
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** The hash of the uploaded app data
+
+---
+
+### get_app_data
+
+Retrieve app data by its hash.
+
+```python
+async def get_app_data(
+    self, 
+    app_data_hash: AppDataHash, 
+    context_override: Context = {}
+) -> Dict[str, Any]
+```
+
+<ParamField path="app_data_hash" type="AppDataHash" required>
+  The hash of the app data to retrieve
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** Dictionary containing the app data
+
+---
+
+### get_order_multi_env
+
+Search for an order across multiple environments.
+
+```python
+async def get_order_multi_env(
+    self, 
+    order_uid: UID, 
+    context_override: Context = {}
+) -> Order | None
+```
+
+<ParamField path="order_uid" type="UID" required>
+  The unique order identifier
+</ParamField>
+
+<ParamField path="context_override" type="Context" default="{}">
+  Optional context overrides for the request
+</ParamField>
+
+**Returns:** The `Order` object if found in any environment, or `None` if not found
+
+**Example:**
+```python
+# Searches across prod, staging, and other environments
+order = await api.get_order_multi_env(order_uid)
+if order:
+    print(f"Found order: {order.status}")
+else:
+    print("Order not found in any environment")
+```

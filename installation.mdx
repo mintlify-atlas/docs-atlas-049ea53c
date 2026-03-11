@@ -1,0 +1,114 @@
+---
+title: Installation
+description: Learn how to install the CoW Protocol Python SDK
+icon: download
+---
+
+## Prerequisites
+
+Before installing the CoW Protocol Python SDK, ensure you have the following:
+
+<Info>
+  **Python Version**: Python 3.10 or higher is required
+</Info>
+
+<Note>
+  The SDK is tested on Python 3.10, 3.11, and 3.12. We recommend using the latest stable Python version for the best experience.
+</Note>
+
+## Installation via pip
+
+The easiest way to install the CoW Protocol Python SDK is via pip:
+
+```bash
+pip install cowdao-cowpy
+```
+
+<Tip>
+  It's recommended to use a virtual environment to manage your project dependencies. You can create one using `venv` or `poetry`.
+</Tip>
+
+## Using Poetry
+
+If you're using Poetry for dependency management, add the SDK to your project:
+
+```bash
+poetry add cowdao-cowpy
+```
+
+## Core Dependencies
+
+The SDK automatically installs the following key dependencies:
+
+<Steps>
+  <Step title="Web3 Integration">
+    **web3** (version 6.0.0 or higher, below 8.0.0) - For Ethereum and blockchain interactions
+  </Step>
+  
+  <Step title="HTTP Client">
+    **httpx** (version 0.23.0 or higher, below 1.0.0) - Async HTTP client for API calls
+  </Step>
+  
+  <Step title="Data Validation">
+    **pydantic** (version 2.7.0 or higher) - Type-safe data models and validation
+  </Step>
+  
+  <Step title="Additional Libraries">
+    - **eth-abi** (version 5.1.0 or higher) - Ethereum ABI encoding/decoding
+    - **eth-typing** (version 4.0.0 or higher, below 6.0.0) - Type hints for Ethereum
+    - **backoff** (version 2.2.1 or higher) - Retry logic for API calls
+    - **aiolimiter** (version 1.1.0 or higher) - Rate limiting for async operations
+  </Step>
+</Steps>
+
+## Development Installation
+
+For contributors or developers who want to work with the source code:
+
+<CodeGroup>
+```bash Clone Repository
+git clone https://github.com/cowdao-grants/cow-py.git
+cd cow-py
+```
+
+```bash Install with Poetry
+poetry install
+```
+
+```bash Activate Environment
+poetry shell
+```
+</CodeGroup>
+
+## Verify Installation
+
+After installation, verify that the SDK is working correctly:
+
+```python
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.common.chains import Chain
+
+# Initialize the API client
+order_book_api = OrderBookApi()
+
+print("CoW Protocol SDK installed successfully!")
+```
+
+<Warning>
+  If you encounter import errors, ensure your Python version meets the minimum requirement (3.10+) and all dependencies are properly installed.
+</Warning>
+
+## Environment Setup
+
+For interacting with the CoW Protocol, you'll need:
+
+1. **Private Key**: An Ethereum wallet private key (for signing transactions)
+2. **RPC Endpoint**: Access to an Ethereum/Gnosis Chain node (optional, but recommended for production)
+
+<Note>
+  Never commit your private keys to version control. Use environment variables or `.env` files (with `.gitignore`) to manage sensitive credentials.
+</Note>
+
+## Next Steps
+
+Now that you have the SDK installed, continue to the [Quickstart](/quickstart) guide to learn how to execute your first token swap!

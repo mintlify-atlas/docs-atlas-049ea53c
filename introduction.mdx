@@ -1,0 +1,159 @@
+---
+title: Introduction
+description: Python SDK for interacting with CoWSwap and CoW Protocol, featuring MEV-protected trading, order management, and multi-chain support.
+---
+
+<div style={{
+  background: 'linear-gradient(135deg, #fac704 0%, #c12306 100%)',
+  padding: '48px 32px',
+  borderRadius: '6px',
+  marginBottom: '32px'
+}}>
+  <h1 style={{ color: 'white', fontSize: '36px', marginBottom: '16px', fontWeight: '400' }}>
+    CoW Protocol Python SDK
+  </h1>
+  <p style={{ color: 'white', fontSize: '18px', marginBottom: '24px', opacity: 0.95 }}>
+    Build DeFi applications with MEV-protected trading on CoWSwap
+  </p>
+  <div style={{ display: 'flex', gap: '12px' }}>
+    <a href="/quickstart" style={{
+      background: '#f3f4f6',
+      color: '#6b7280',
+      padding: '10px 20px',
+      borderRadius: '6px',
+      textDecoration: 'none',
+      fontWeight: '500'
+    }}>
+      Get Started →
+    </a>
+    <a href="https://github.com/cowdao-grants/cow-py" style={{
+      background: 'transparent',
+      color: 'white',
+      padding: '10px 20px',
+      border: '2px solid white',
+      borderRadius: '6px',
+      textDecoration: 'none',
+      fontWeight: '500'
+    }}>
+      View on GitHub
+    </a>
+  </div>
+</div>
+
+## What is CoW Protocol?
+
+CoW Protocol (Coincidence of Wants) powers CoWSwap, a decentralized exchange aggregator that protects traders from MEV (Maximal Extractable Value) through batch auctions and intent-based trading. The `cowdao_cowpy` Python SDK enables developers to programmatically interact with CoWSwap and the CoW Protocol ecosystem.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="MEV-Protected Trading" icon="shield-halved" href="/concepts/trading">
+    Execute trades with built-in protection against front-running and sandwich attacks
+  </Card>
+  <Card title="Multi-Chain Support" icon="link" href="/concepts/chains">
+    Trade on Ethereum, Gnosis Chain, Arbitrum, Base, Polygon, Avalanche, BNB, and Lens
+  </Card>
+  <Card title="Order Management" icon="list-check" href="/guides/managing-orders">
+    Create, fetch, and cancel orders with full Python type hints
+  </Card>
+  <Card title="Subgraph Querying" icon="chart-line" href="/guides/querying-subgraph">
+    Access trading data and analytics via GraphQL queries
+  </Card>
+  <Card title="Smart Contract Integration" icon="file-contract" href="/guides/contract-interaction">
+    Interact with CoW Protocol smart contracts using Web3.py
+  </Card>
+  <Card title="Advanced Orders" icon="clock" href="/advanced/composable-orders">
+    Build composable conditional orders and TWAP strategies
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+The CoW Protocol Python SDK is perfect for:
+
+- **Trading Bots** — Automate trading strategies with MEV protection
+- **DeFi Applications** — Integrate CoWSwap functionality into your projects
+- **Data Analytics** — Query trading volumes, order history, and market data
+- **Solver Development** — Build custom order matching solutions
+- **Portfolio Management** — Execute multi-token swaps across chains
+
+## Quick Example
+
+Here's a simple token swap using the SDK:
+
+```python swap_example.py
+import os
+import asyncio
+from web3 import Account, Web3
+from web3.types import Wei
+from cowdao_cowpy.cow.swap import swap_tokens
+from cowdao_cowpy.common.chains import Chain
+
+# Configuration
+BUY_TOKEN = Web3.to_checksum_address("0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14")  # WETH
+SELL_TOKEN = Web3.to_checksum_address("0xbe72E441BF55620febc26715db68d3494213D8Cb")  # USDC
+SELL_AMOUNT = Wei(5000000000000000000)  # 50 USDC with 18 decimals
+
+# Load account
+PRIVATE_KEY = os.getenv("PRIVATE_KEY")
+account = Account.from_key(PRIVATE_KEY)
+
+# Execute swap
+asyncio.run(
+    swap_tokens(
+        amount=SELL_AMOUNT,
+        account=account,
+        chain=Chain.SEPOLIA,
+        sell_token=SELL_TOKEN,
+        buy_token=BUY_TOKEN,
+    )
+)
+```
+
+## Why Choose CoW Protocol SDK?
+
+<AccordionGroup>
+  <Accordion title="Type-Safe Development">
+    Full Python type hints and Pydantic models throughout the SDK ensure compile-time safety and excellent IDE support.
+  </Accordion>
+  
+  <Accordion title="Async/Await Support">
+    Native asyncio support for building high-performance applications that can handle multiple concurrent operations.
+  </Accordion>
+  
+  <Accordion title="Web3.py Integration">
+    Seamless integration with Web3.py for Ethereum and other EVM-compatible chains.
+  </Accordion>
+  
+  <Accordion title="Gasless Trading">
+    Pay transaction fees in sell tokens instead of ETH, making trading more accessible.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install the SDK via pip and set up your environment
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Execute your first token swap in minutes
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/concepts/chains">
+    Learn about chains, orders, and trading mechanics
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/swap">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>
+
+## Community & Support
+
+- **GitHub Repository**: [cowdao-grants/cow-py](https://github.com/cowdao-grants/cow-py)
+- **CoW Protocol Docs**: [docs.cow.fi](https://docs.cow.fi/)
+- **Discord**: [Join the community](https://discord.gg/cowprotocol)
+- **Twitter**: [@CoWSwap](https://x.com/CoWSwap)
+
+<Note>
+  This SDK is community-maintained and not officially endorsed by CoW Protocol. For production use, thoroughly test your integration and understand the risks involved in DeFi trading.
+</Note>

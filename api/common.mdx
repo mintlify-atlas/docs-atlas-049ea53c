@@ -1,0 +1,521 @@
+---
+title: "Common"
+description: "API reference for common types, configuration, and utilities in the CoW Protocol Python SDK"
+---
+
+## Overview
+
+The `common` module provides core types, configuration, constants, and error handling used throughout the CoW Protocol Python SDK.
+
+## Chain
+
+Enum representing supported blockchain networks.
+
+### Values
+
+```python
+from cowdao_cowpy.common.chains import Chain
+
+class Chain(Enum):
+    MAINNET = (SupportedChainId.MAINNET, "ethereum", "https://etherscan.io")
+    SEPOLIA = (SupportedChainId.SEPOLIA, "sepolia", "https://sepolia.etherscan.io")
+    GNOSIS = (SupportedChainId.GNOSIS_CHAIN, "gnosis", "https://gnosisscan.io")
+    ARBITRUM_ONE = (SupportedChainId.ARBITRUM_ONE, "arbitrum_one", "https://arbiscan.io")
+    BASE = (SupportedChainId.BASE, "base", "https://basescan.org/")
+    POLYGON = (SupportedChainId.POLYGON, "polygon", "https://polygonscan.com")
+    AVALANCHE = (SupportedChainId.AVALANCHE, "avalanche", "https://snowtrace.io")
+    BNB = (SupportedChainId.BNB, "bnb", "https://bscscan.com")
+    LENS = (SupportedChainId.LENS, "lens", "https://explorer.lens.xyz/")
+```
+
+<ResponseField name="MAINNET" type="Chain">
+  Ethereum Mainnet (Chain ID: 1)
+</ResponseField>
+
+<ResponseField name="SEPOLIA" type="Chain">
+  Sepolia Testnet (Chain ID: 11155111)
+</ResponseField>
+
+<ResponseField name="GNOSIS" type="Chain">
+  Gnosis Chain (Chain ID: 100)
+</ResponseField>
+
+<ResponseField name="ARBITRUM_ONE" type="Chain">
+  Arbitrum One (Chain ID: 42161)
+</ResponseField>
+
+<ResponseField name="BASE" type="Chain">
+  Base (Chain ID: 8453)
+</ResponseField>
+
+<ResponseField name="POLYGON" type="Chain">
+  Polygon (Chain ID: 137)
+</ResponseField>
+
+<ResponseField name="AVALANCHE" type="Chain">
+  Avalanche C-Chain (Chain ID: 43114)
+</ResponseField>
+
+<ResponseField name="BNB" type="Chain">
+  BNB Smart Chain (Chain ID: 56)
+</ResponseField>
+
+<ResponseField name="LENS" type="Chain">
+  Lens Network (Chain ID: 232)
+</ResponseField>
+
+### Properties
+
+```python
+chain = Chain.MAINNET
+
+chain.chain_id      # SupportedChainId.MAINNET (value: 1)
+chain.name          # "ethereum"
+chain.explorer      # "https://etherscan.io"
+```
+
+<ResponseField name="chain_id" type="SupportedChainId">
+  The numeric chain ID as a `SupportedChainId` enum value.
+</ResponseField>
+
+<ResponseField name="name" type="str">
+  Human-readable network name.
+</ResponseField>
+
+<ResponseField name="explorer" type="str">
+  Block explorer URL for the network.
+</ResponseField>
+
+### Example
+
+```python
+from cowdao_cowpy.common.chains import Chain
+
+# Use in order creation
+chain = Chain.MAINNET
+print(f"Using {chain.name} (Chain ID: {chain.chain_id.value})")
+print(f"Explorer: {chain.explorer}")
+
+# Iterate all supported chains
+from cowdao_cowpy.common.chains import SUPPORTED_CHAINS
+
+for chain in SUPPORTED_CHAINS:
+    print(f"{chain.name}: Chain ID {chain.chain_id.value}")
+```
+
+---
+
+## Configuration
+
+### SupportedChainId
+
+Enum of supported chain IDs.
+
+```python
+from cowdao_cowpy.common.config import SupportedChainId
+
+class SupportedChainId(Enum):
+    MAINNET = 1
+    GNOSIS_CHAIN = 100
+    SEPOLIA = 11155111
+    ARBITRUM_ONE = 42161
+    BASE = 8453
+    POLYGON = 137
+    AVALANCHE = 43114
+    BNB = 56
+    LENS = 232
+```
+
+### CowEnv
+
+Environment configuration for CoW Protocol API.
+
+```python
+from cowdao_cowpy.common.config import CowEnv
+
+class CowEnv(Enum):
+    PROD = "prod"
+    STAGING = "staging"
+```
+
+<ResponseField name="PROD" type="str">
+  Production environment.
+</ResponseField>
+
+<ResponseField name="STAGING" type="str">
+  Staging/testing environment.
+</ResponseField>
+
+### ApiContext
+
+Configuration context for API requests.
+
+```python
+from cowdao_cowpy.common.config import ApiContext, SupportedChainId, CowEnv
+
+context = ApiContext(
+    chain_id=SupportedChainId.MAINNET,
+    env=CowEnv.PROD,
+    base_urls=None,
+    max_tries=5
+)
+```
+
+<ParamField path="chain_id" type="SupportedChainId" required>
+  The blockchain network to use.
+</ParamField>
+
+<ParamField path="env" type="CowEnv" required>
+  The API environment (production or staging).
+</ParamField>
+
+<ParamField path="base_urls" type="Optional[ApiBaseUrls]" default="None">
+  Custom base URLs for API endpoints. If not provided, uses default URLs.
+</ParamField>
+
+<ParamField path="max_tries" type="Optional[int]" default="5">
+  Maximum number of retry attempts for API requests.
+</ParamField>
+
+### DEFAULT_COW_API_CONTEXT
+
+Default API context configuration:
+
+```python
+DEFAULT_COW_API_CONTEXT = ApiContext(
+    env=CowEnv.PROD,
+    chain_id=SupportedChainId.MAINNET
+)
+```
+
+### IPFSConfig
+
+IPFS gateway configuration.
+
+```python
+from cowdao_cowpy.common.config import IPFSConfig
+
+class IPFSConfig(Enum):
+    READ_URI = "https://gnosis.mypinata.cloud/ipfs"
+    WRITE_URI = "https://api.pinata.cloud"
+```
+
+<ResponseField name="READ_URI" type="str">
+  IPFS read gateway URL.
+</ResponseField>
+
+<ResponseField name="WRITE_URI" type="str">
+  IPFS write/upload API URL.
+</ResponseField>
+
+---
+
+## Constants
+
+### Contract Addresses
+
+CoW Protocol contract addresses across all supported networks.
+
+```python
+from cowdao_cowpy.common.constants import (
+    CowContractAddress,
+    COW_PROTOCOL_SETTLEMENT_CONTRACT_CHAIN_ADDRESS_MAP,
+    COW_PROTOCOL_VAULT_RELAYER_CHAIN_ADDRESS_MAP,
+    COMPOSABLE_COW_CONTRACT_CHAIN_ADDRESS_MAP,
+    EXTENSIBLE_FALLBACK_HANDLER_CONTRACT_CHAIN_ADDRESS_MAP,
+)
+```
+
+#### CowContractAddress
+
+```python
+class CowContractAddress(Enum):
+    VAULT_RELAYER = "0xC92E8bdf79f0507f65a392b0ab4667716BFE0110"
+    COMPOSABLE_COW = "0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74"
+    SETTLEMENT_CONTRACT = "0x9008D19f58AAbD9eD0D60971565AA8510560ab41"
+    EXTENSIBLE_FALLBACK_HANDLER = "0x2f55e8b20D0B9FEFA187AA7d00B6Cbe563605bF5"
+```
+
+<ResponseField name="VAULT_RELAYER" type="str">
+  GPv2VaultRelayer contract address (same across all networks).
+</ResponseField>
+
+<ResponseField name="COMPOSABLE_COW" type="str">
+  ComposableCow contract address for conditional orders.
+</ResponseField>
+
+<ResponseField name="SETTLEMENT_CONTRACT" type="str">
+  GPv2Settlement contract address for order settlement.
+</ResponseField>
+
+<ResponseField name="EXTENSIBLE_FALLBACK_HANDLER" type="str">
+  ExtensibleFallbackHandler for Safe wallet integration.
+</ResponseField>
+
+#### Contract Address Maps
+
+Dictionaries mapping chain IDs to contract addresses:
+
+```python
+# Get settlement contract for mainnet
+settlement_address = COW_PROTOCOL_SETTLEMENT_CONTRACT_CHAIN_ADDRESS_MAP[
+    SupportedChainId.MAINNET
+].value
+
+# Get ComposableCow contract for Gnosis Chain
+composable_cow = COMPOSABLE_COW_CONTRACT_CHAIN_ADDRESS_MAP[
+    SupportedChainId.GNOSIS_CHAIN
+].value
+```
+
+<Expandable title="Available Contract Maps">
+  <ResponseField name="COW_PROTOCOL_SETTLEMENT_CONTRACT_CHAIN_ADDRESS_MAP" type="Dict[SupportedChainId, CowContractAddress]">
+    Maps chain IDs to settlement contract addresses.
+  </ResponseField>
+  
+  <ResponseField name="COW_PROTOCOL_VAULT_RELAYER_CHAIN_ADDRESS_MAP" type="Dict[SupportedChainId, CowContractAddress]">
+    Maps chain IDs to vault relayer addresses.
+  </ResponseField>
+  
+  <ResponseField name="COMPOSABLE_COW_CONTRACT_CHAIN_ADDRESS_MAP" type="Dict[SupportedChainId, CowContractAddress]">
+    Maps chain IDs to ComposableCow contract addresses.
+  </ResponseField>
+  
+  <ResponseField name="EXTENSIBLE_FALLBACK_HANDLER_CONTRACT_CHAIN_ADDRESS_MAP" type="Dict[SupportedChainId, CowContractAddress]">
+    Maps chain IDs to ExtensibleFallbackHandler addresses.
+  </ResponseField>
+</Expandable>
+
+### ZERO_APP_DATA
+
+Zero hash constant for orders without app data:
+
+```python
+ZERO_APP_DATA = "0x0000000000000000000000000000000000000000000000000000000000000000"
+```
+
+### Example
+
+```python
+from cowdao_cowpy.common.constants import (
+    COW_PROTOCOL_SETTLEMENT_CONTRACT_CHAIN_ADDRESS_MAP,
+    COMPOSABLE_COW_CONTRACT_CHAIN_ADDRESS_MAP,
+)
+from cowdao_cowpy.common.config import SupportedChainId
+
+# Get contract addresses for Mainnet
+chain_id = SupportedChainId.MAINNET
+settlement = COW_PROTOCOL_SETTLEMENT_CONTRACT_CHAIN_ADDRESS_MAP[chain_id].value
+composable_cow = COMPOSABLE_COW_CONTRACT_CHAIN_ADDRESS_MAP[chain_id].value
+
+print(f"Settlement: {settlement}")
+print(f"ComposableCow: {composable_cow}")
+
+# Iterate all chains
+for chain_id in SupportedChainId:
+    address = COW_PROTOCOL_SETTLEMENT_CONTRACT_CHAIN_ADDRESS_MAP[chain_id].value
+    print(f"{chain_id.name}: {address}")
+```
+
+---
+
+## Error Handling
+
+### CowError
+
+Base exception class for CoW Protocol SDK errors.
+
+```python
+from cowdao_cowpy.common.cow_error import CowError
+
+class CowError(Exception):
+    def __init__(self, message, error_code=None):
+        super().__init__(message)
+        self.error_code = error_code
+```
+
+<ParamField path="message" type="str" required>
+  Error message describing what went wrong.
+</ParamField>
+
+<ParamField path="error_code" type="Optional[Any]" default="None">
+  Optional error code for programmatic error handling.
+</ParamField>
+
+### Usage
+
+```python
+from cowdao_cowpy.common.cow_error import CowError
+
+try:
+    # Some SDK operation
+    pass
+except CowError as e:
+    print(f"CoW SDK Error: {e}")
+    if e.error_code:
+        print(f"Error code: {e.error_code}")
+```
+
+### Creating Custom Errors
+
+```python
+from cowdao_cowpy.common.cow_error import CowError
+
+class InvalidOrderError(CowError):
+    def __init__(self, reason: str):
+        super().__init__(f"Invalid order: {reason}", error_code="INVALID_ORDER")
+
+# Usage
+raise InvalidOrderError("Sell amount must be positive")
+```
+
+### LOG_PREFIX
+
+Logging prefix constant:
+
+```python
+from cowdao_cowpy.common.cow_error import LOG_PREFIX
+
+print(f"{LOG_PREFIX} Processing order...")  # "cow-sdk: Processing order..."
+```
+
+---
+
+## Complete Example
+
+```python
+from cowdao_cowpy.common.chains import Chain, SUPPORTED_CHAINS
+from cowdao_cowpy.common.config import (
+    ApiContext,
+    CowEnv,
+    SupportedChainId,
+    DEFAULT_COW_API_CONTEXT,
+)
+from cowdao_cowpy.common.constants import (
+    COW_PROTOCOL_SETTLEMENT_CONTRACT_CHAIN_ADDRESS_MAP,
+    COMPOSABLE_COW_CONTRACT_CHAIN_ADDRESS_MAP,
+    ZERO_APP_DATA,
+)
+from cowdao_cowpy.common.cow_error import CowError, LOG_PREFIX
+
+def setup_chain_config(chain: Chain):
+    """Setup configuration for a specific chain."""
+    try:
+        # Get chain ID
+        chain_id = chain.chain_id
+        
+        # Create API context
+        context = ApiContext(
+            chain_id=chain_id,
+            env=CowEnv.PROD,
+            max_tries=3
+        )
+        
+        # Get contract addresses
+        settlement = COW_PROTOCOL_SETTLEMENT_CONTRACT_CHAIN_ADDRESS_MAP[chain_id].value
+        composable_cow = COMPOSABLE_COW_CONTRACT_CHAIN_ADDRESS_MAP[chain_id].value
+        
+        print(f"{LOG_PREFIX} Chain: {chain.name}")
+        print(f"{LOG_PREFIX} Chain ID: {chain_id.value}")
+        print(f"{LOG_PREFIX} Explorer: {chain.explorer}")
+        print(f"{LOG_PREFIX} Settlement: {settlement}")
+        print(f"{LOG_PREFIX} ComposableCow: {composable_cow}")
+        
+        return context
+        
+    except KeyError as e:
+        raise CowError(
+            f"Chain {chain.name} not supported for this contract",
+            error_code="UNSUPPORTED_CHAIN"
+        )
+
+# Setup for mainnet
+config = setup_chain_config(Chain.MAINNET)
+
+# List all supported chains
+print("\nSupported chains:")
+for chain in SUPPORTED_CHAINS:
+    print(f"  - {chain.name} (ID: {chain.chain_id.value})")
+
+# Use zero app data for simple orders
+app_data = ZERO_APP_DATA
+print(f"\nUsing zero app data: {app_data}")
+```
+
+---
+
+## Type Aliases
+
+### ApiBaseUrls
+
+```python
+ApiBaseUrls = Dict[SupportedChainId, str]
+```
+
+Mapping of chain IDs to API base URLs.
+
+---
+
+## Environment Variables
+
+The common module respects these environment variables:
+
+<ParamField path="IPFS_READ_URI" type="str">
+  Custom IPFS read gateway. Defaults to `https://cloudflare-ipfs.com/ipfs`.
+</ParamField>
+
+```python
+import os
+
+# Set custom IPFS gateway
+os.environ['IPFS_READ_URI'] = 'https://my-ipfs-gateway.com/ipfs'
+```
+
+---
+
+## Best Practices
+
+### Chain Selection
+
+```python
+from cowdao_cowpy.common.chains import Chain
+
+# ✅ Good: Use enum values
+chain = Chain.MAINNET
+
+# ❌ Bad: Don't use raw chain IDs
+chain_id = 1  # Less readable and type-safe
+```
+
+### Error Handling
+
+```python
+from cowdao_cowpy.common.cow_error import CowError
+
+try:
+    # SDK operations
+    pass
+except CowError as e:
+    # Handle SDK-specific errors
+    print(f"SDK error: {e}")
+except Exception as e:
+    # Handle other errors
+    print(f"Unexpected error: {e}")
+```
+
+### Configuration
+
+```python
+from cowdao_cowpy.common.config import ApiContext, CowEnv, SupportedChainId
+
+# ✅ Good: Create explicit contexts for different environments
+prod_context = ApiContext(
+    chain_id=SupportedChainId.MAINNET,
+    env=CowEnv.PROD
+)
+
+staging_context = ApiContext(
+    chain_id=SupportedChainId.SEPOLIA,
+    env=CowEnv.STAGING
+)
+```

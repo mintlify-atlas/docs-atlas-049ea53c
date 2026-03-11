@@ -1,0 +1,561 @@
+---
+title: "App Data"
+description: "API reference for app data management in the CoW Protocol Python SDK"
+---
+
+## Overview
+
+The `app_data` module provides tools for creating, encoding, and managing app data for CoW Protocol orders. App data allows you to attach metadata to orders, including referrer information, partner fees, and custom graffiti.
+
+## AppDataDoc
+
+Creates and manages app data documents that can be hashed or converted to IPFS CIDs.
+
+### Constructor
+
+```python
+from cowdao_cowpy.app_data import AppDataDoc
+
+app_data = AppDataDoc(
+    app_data_doc={"appCode": "my-app"},
+    app_data_doc_string=""
+)
+```
+
+<ParamField path="app_data_doc" type="Dict[str, Any]" default="{}">
+  Dictionary containing app data fields. Merged with default app data structure. Common fields:
+  - `appCode`: Your application identifier
+  - `metadata`: Nested metadata object
+  - `version`: App data schema version
+</ParamField>
+
+<ParamField path="app_data_doc_string" type="str" default='""'>
+  Pre-serialized app data string. If provided, takes precedence over `app_data_doc`.
+</ParamField>
+
+### Methods
+
+#### to_string
+
+```python
+def to_string(self) -> str:
+    """Serialize app data to deterministic JSON string."""
+```
+
+<ResponseField name="return" type="str">
+  Returns a deterministically ordered JSON string of the app data.
+</ResponseField>
+
+```python
+app_data = AppDataDoc({"appCode": "my-app"})
+json_string = app_data.to_string()
+print(json_string)  # {"appCode":"my-app",...}
+```
+
+#### to_hex
+
+```python
+def to_hex(self) -> str:
+    """Generate keccak256 hash of the app data."""
+```
+
+<ResponseField name="return" type="str">
+  Returns the keccak256 hash of the serialized app data as a hex string with '0x' prefix.
+</ResponseField>
+
+```python
+app_data_hash = app_data.to_hex()
+print(app_data_hash)  # "0xabc123..."
+```
+
+#### to_cid
+
+```python
+def to_cid(self) -> str:
+    """Convert app data to IPFS CID."""
+```
+
+<ResponseField name="return" type="str">
+  Returns the IPFS Content Identifier (CID) for the app data hash.
+</ResponseField>
+
+```python
+cid = app_data.to_cid()
+print(cid)  # "f01..."
+```
+
+### Example
+
+```python
+from cowdao_cowpy.app_data import AppDataDoc
+
+# Create app data with custom metadata
+app_data = AppDataDoc({
+    "appCode": "my-trading-bot",
+    "metadata": {
+        "referrer": {
+            "address": "0x1234567890123456789012345678901234567890"
+        },
+        "utm": {
+            "utmSource": "my-app",
+            "utmContent": "Custom message"
+        }
+    }
+})
+
+# Get different representations
+json_str = app_data.to_string()
+app_data_hash = app_data.to_hex()
+ipfs_cid = app_data.to_cid()
+
+print(f"Hash: {app_data_hash}")
+print(f"CID: {ipfs_cid}")
+```
+
+---
+
+## AppDataHex
+
+Converts app data hashes to IPFS CIDs and retrieves documents from IPFS.
+
+### Constructor
+
+```python
+from cowdao_cowpy.app_data import AppDataHex
+
+app_data_hex = AppDataHex("abc123def456...")  # Without 0x prefix
+```
+
+<ParamField path="app_data_hex" type="str" required>
+  The app data hash as a hex string (without '0x' prefix).
+</ParamField>
+
+### Methods
+
+#### to_cid
+
+```python
+def to_cid(self) -> str:
+    """Convert app data hex to IPFS CID."""
+```
+
+<ResponseField name="return" type="str">
+  Returns the IPFS CID (v1, base16 encoded with keccak-256 hash).
+</ResponseField>
+
+```python
+app_data_hex = AppDataHex("971c41b97f59534448ab833b0d83f755a4bc5c29f92b01776faa3699fcb0eeae")
+cid = app_data_hex.to_cid()
+```
+
+#### to_doc
+
+```python
+async def to_doc(self, ipfs_uri: str = DEFAULT_IPFS_READ_URI) -> Dict[str, Any]:
+    """Fetch the app data document from IPFS."""
+```
+
+<ParamField path="ipfs_uri" type="str" default="DEFAULT_IPFS_READ_URI">
+  The IPFS gateway URI. Defaults to `https://cloudflare-ipfs.com/ipfs`.
+</ParamField>
+
+<ResponseField name="return" type="Dict[str, Any]">
+  Returns the app data document as a dictionary.
+</ResponseField>
+
+```python
+import asyncio
+from cowdao_cowpy.app_data import AppDataHex
+
+async def fetch_app_data():
+    app_data_hex = AppDataHex("971c41b97f59534448ab833b0d83f755a4bc5c29f92b01776faa3699fcb0eeae")
+    doc = await app_data_hex.to_doc()
+    print(doc)
+
+asyncio.run(fetch_app_data())
+```
+
+---
+
+## AppDataCid
+
+Converts IPFS CIDs to app data hashes and retrieves documents.
+
+### Constructor
+
+```python
+from cowdao_cowpy.app_data import AppDataCid
+
+app_data_cid = AppDataCid("f01...")  # IPFS CID
+```
+
+<ParamField path="app_data_cid" type="str" required>
+  The IPFS Content Identifier (CID).
+</ParamField>
+
+### Methods
+
+#### to_hex
+
+```python
+def to_hex(self) -> str:
+    """Extract the app data hash from the CID."""
+```
+
+<ResponseField name="return" type="str">
+  Returns the app data hash with '0x' prefix.
+</ResponseField>
+
+```python
+from cowdao_cowpy.app_data import AppDataCid
+
+app_data_cid = AppDataCid("f01551b1b971c41b97f59534448ab833b0d83f755a4bc5c29f92b01776faa3699fcb0eeae")
+hex_hash = app_data_cid.to_hex()
+print(hex_hash)  # "0x971c41b9..."
+```
+
+#### to_doc
+
+```python
+async def to_doc(self, ipfs_uri: str = DEFAULT_IPFS_READ_URI) -> Dict[str, Any]:
+    """Fetch the app data document from IPFS."""
+```
+
+<ParamField path="ipfs_uri" type="str" default="DEFAULT_IPFS_READ_URI">
+  The IPFS gateway URI.
+</ParamField>
+
+<ResponseField name="return" type="Dict[str, Any]">
+  Returns the app data document.
+</ResponseField>
+
+---
+
+## Utility Functions
+
+### generate_app_data
+
+Generate app data with common parameters like referrer address and partner fees.
+
+```python
+from cowdao_cowpy.app_data.utils import generate_app_data, PartnerFee
+
+app_data = generate_app_data(
+    app_code="my-app",
+    partner_fee=PartnerFee(bps=50, recipient="0x..."),
+    referrer_address="0x...",
+    graffiti="My custom message"
+)
+```
+
+<ParamField path="app_code" type="str" default="None">
+  Your application code/identifier.
+</ParamField>
+
+<ParamField path="partner_fee" type="PartnerFee" default="None">
+  Partner fee configuration with `bps` (basis points) and `recipient` address.
+</ParamField>
+
+<ParamField path="referrer_address" type="str" default="None">
+  Referrer's Ethereum address.
+</ParamField>
+
+<ParamField path="graffiti" type="str" default="None">
+  Custom graffiti message to include in metadata.
+</ParamField>
+
+<ResponseField name="return" type="CreateAppData">
+  Returns a `CreateAppData` object containing:
+  - `app_data_object`: The serialized app data
+  - `app_data_hash`: The keccak256 hash
+</ResponseField>
+
+```python
+from cowdao_cowpy.app_data.utils import generate_app_data, PartnerFee
+
+app_data = generate_app_data(
+    app_code="my-dex-aggregator",
+    partner_fee=PartnerFee(
+        bps=50,  # 0.5% fee
+        recipient="0x1234567890123456789012345678901234567890"
+    ),
+    referrer_address="0xabcdef1234567890123456789012345678901234",
+    graffiti="Powered by My DEX"
+)
+
+print(f"App Data Hash: {app_data.app_data_hash.root}")
+```
+
+### build_and_post_app_data
+
+Build app data and upload it to the CoW Protocol orderbook API.
+
+```python
+from cowdao_cowpy.app_data.utils import build_and_post_app_data
+from cowdao_cowpy.order_book.api import OrderBookApi
+
+app_data_hash = build_and_post_app_data(
+    orderbook=orderbook_api,
+    app_code="my-app",
+    referrer_address="0x...",
+    partner_fee=PartnerFee(bps=50, recipient="0x..."),
+    graffiti="Custom message"
+)
+```
+
+<ParamField path="orderbook" type="OrderBookApi" required>
+  OrderBookApi instance for the target network.
+</ParamField>
+
+<ParamField path="app_code" type="str" default="None">
+  Your application code.
+</ParamField>
+
+<ParamField path="referrer_address" type="str" default="None">
+  Referrer's address.
+</ParamField>
+
+<ParamField path="partner_fee" type="PartnerFee" default="None">
+  Partner fee configuration.
+</ParamField>
+
+<ParamField path="graffiti" type="str" default="None">
+  Custom graffiti message.
+</ParamField>
+
+<ResponseField name="return" type="str">
+  Returns the app data hash if upload succeeds, or hash from cache if already exists.
+</ResponseField>
+
+### build_all_app_codes
+
+Build and post app data across all supported chains.
+
+```python
+from cowdao_cowpy.app_data.utils import build_all_app_codes
+from cowdao_cowpy.common.api.api_base import Envs
+
+app_data_hash = build_all_app_codes(
+    env=Envs.PROD,
+    app_code="my-app",
+    graffiti="My message",
+    referrer_address="0x...",
+    partner_fee=None
+)
+```
+
+<ParamField path="env" type="Envs" default="Envs.PROD">
+  Environment: `Envs.PROD` or `Envs.STAGING`.
+</ParamField>
+
+<ResponseField name="return" type="str">
+  Returns the app data hash after uploading to all chains.
+</ResponseField>
+
+### stringify_deterministic
+
+Serialize a dictionary to deterministic JSON (sorted keys).
+
+```python
+from cowdao_cowpy.app_data.utils import stringify_deterministic
+
+json_str = stringify_deterministic({"b": 2, "a": 1})
+print(json_str)  # '{"a":1,"b":2}'
+```
+
+### extract_digest
+
+Extract the hash digest from an IPFS CID.
+
+```python
+from cowdao_cowpy.app_data.utils import extract_digest
+
+hex_hash = extract_digest("f01551b1b971c41b97f59534448ab833b0d83f755a4bc5c29f92b01776faa3699fcb0eeae")
+print(hex_hash)  # "0x971c41b9..."
+```
+
+### fetch_doc_from_cid
+
+Fetch a document from IPFS using a CID.
+
+```python
+from cowdao_cowpy.app_data.utils import fetch_doc_from_cid
+import asyncio
+
+async def fetch():
+    doc = await fetch_doc_from_cid("f01551b1b...", ipfs_uri="https://cloudflare-ipfs.com/ipfs")
+    return doc
+
+doc = asyncio.run(fetch())
+```
+
+---
+
+## Data Classes
+
+### PartnerFee
+
+```python
+@dataclass
+class PartnerFee:
+    bps: int        # Basis points (100 = 1%)
+    recipient: str  # Recipient address
+```
+
+Used to specify partner fee configuration.
+
+```python
+fee = PartnerFee(bps=50, recipient="0x1234567890123456789012345678901234567890")
+```
+
+### QuoteFee
+
+```python
+@dataclass
+class QuoteFee:
+    slippageBips: int = 1
+    version: str = "0.2.0"
+```
+
+Configuration for quote fee parameters.
+
+### CreateAppData
+
+```python
+@dataclass
+class CreateAppData:
+    app_data_object: AppDataObject
+    app_data_hash: AppDataHash
+```
+
+Return type from `generate_app_data()` containing both the serialized object and its hash.
+
+---
+
+## Constants
+
+### DEFAULT_APP_DATA_DOC
+
+The default app data structure used when creating new app data:
+
+```python
+DEFAULT_APP_DATA_DOC = {
+    "appCode": "cowdao_cowpy",
+    "metadata": {
+        "hooks": {
+            "version": "0.1.0",
+        },
+        "utm": {
+            "utmSource": "cowmunity",
+            "utmMedium": "cow-py@{version}",
+            "utmCampaign": "developer-cohort",
+            "utmContent": "🥩📢🌀🐮 'MÖØ'",
+            "utmTerm": "python",
+        },
+    },
+    "version": "1.3.0",
+}
+```
+
+### DEFAULT_IPFS_READ_URI
+
+Default IPFS gateway URI: `https://cloudflare-ipfs.com/ipfs`
+
+Can be overridden via `IPFS_READ_URI` environment variable.
+
+### DEFAULT_APP_CODE
+
+Default application code: `"cowdao_cowpy"`
+
+### DEFAULT_GRAFFITI
+
+Default graffiti message: `"🥩📢🌀🐮 'MÖØ'"`
+
+### LATEST_APP_DATA_VERSION
+
+Current app data schema version: `"1.3.0"`
+
+---
+
+## Error Handling
+
+### MetaDataError
+
+```python
+class MetaDataError(Exception):
+    pass
+```
+
+Raised when there are issues with app data encoding, decoding, or CID conversion.
+
+```python
+from cowdao_cowpy.app_data.consts import MetaDataError
+
+try:
+    app_data_hex = AppDataHex("invalid")
+    cid = app_data_hex.to_cid()
+except MetaDataError as e:
+    print(f"App data error: {e}")
+```
+
+---
+
+## Complete Example
+
+```python
+import asyncio
+from cowdao_cowpy.app_data import AppDataDoc, AppDataHex, AppDataCid
+from cowdao_cowpy.app_data.utils import (
+    generate_app_data,
+    PartnerFee,
+    build_and_post_app_data
+)
+from cowdao_cowpy.order_book.api import OrderBookApi
+from cowdao_cowpy.order_book.config import OrderBookAPIConfigFactory
+from cowdao_cowpy.common.config import SupportedChainId
+
+async def main():
+    # Create custom app data
+    app_data = AppDataDoc({
+        "appCode": "my-trading-app",
+        "metadata": {
+            "referrer": {
+                "address": "0x1234567890123456789012345678901234567890"
+            }
+        }
+    })
+    
+    # Get different formats
+    app_data_hash = app_data.to_hex()
+    app_data_cid = app_data.to_cid()
+    
+    print(f"Hash: {app_data_hash}")
+    print(f"CID: {app_data_cid}")
+    
+    # Generate app data with partner fee
+    generated = generate_app_data(
+        app_code="my-app",
+        partner_fee=PartnerFee(bps=50, recipient="0xabcd..."),
+        graffiti="Powered by My App"
+    )
+    
+    # Upload to orderbook
+    orderbook = OrderBookApi(
+        OrderBookAPIConfigFactory.get_config("prod", SupportedChainId.MAINNET)
+    )
+    
+    uploaded_hash = build_and_post_app_data(
+        orderbook=orderbook,
+        app_code="my-app",
+        graffiti="Custom message"
+    )
+    
+    print(f"Uploaded hash: {uploaded_hash}")
+    
+    # Convert back from hash to document
+    app_data_hex = AppDataHex(uploaded_hash[2:])  # Remove 0x prefix
+    doc = await app_data_hex.to_doc()
+    print(f"Retrieved doc: {doc}")
+
+asyncio.run(main())
+```
